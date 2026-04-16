@@ -100,7 +100,7 @@
             <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3">
               <div class="flex justify-between items-center">
                 <span class="font-semibold text-sm" x-text="b.nome + ' (' + b.intestatario + ')'"></span>
-                <span class="text-sm font-bold text-orange-600 dark:text-orange-400" x-text="formatValuta(totaleDaGirareBanca(b.id))"></span>
+                <span class="text-sm font-bold text-orange-600 dark:text-orange-400" x-text="formatValuta(totaleDaGirareVersoBanca(b.id))"></span>
               </div>
             </div>
           </template>
@@ -697,6 +697,14 @@ function app() {
     isRitardo(inc) { return !inc.dataIncasso && inc.dataPrevista < oggi(); },
     totaleDaGirareBanca(bancaId) {
       return this.dati.incassiAffitti.filter(i => i.bancaId === bancaId && i.dataIncasso && !i.girato).reduce((s, i) => s + (i.importo || 0), 0);
+    },
+    totaleDaGirareVersoBanca(bancaDestId) {
+      // Somma incassi non girati la cui proprietà ha come bancaDestinazione questa banca
+      return this.dati.incassiAffitti.filter(i => {
+        if (!i.dataIncasso || i.girato) return false;
+        const prop = this.dati.proprieta.find(p => p.id === i.proprietaId);
+        return prop && prop.bancaDestinazione === bancaDestId;
+      }).reduce((s, i) => s + (i.importo || 0), 0);
     },
     utenzeInScadenza() {
       const lim = new Date(); lim.setDate(lim.getDate() + 30);
