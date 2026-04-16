@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestione Affitti &amp; Utenze</title>
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Alpine.js per reattivita -->
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'media',
+      theme: {
+        extend: {
+          colors: {
+            primary: { 50:'#eff6ff',100:'#dbeafe',200:'#bfdbfe',300:'#93c5fd',400:'#60a5fa',500:'#3b82f6',600:'#2563eb',700:'#1d4ed8',800:'#1e40af',900:'#1e3a8a' }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    [x-cloak] { display: none !important; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 3px; }
+    .page-enter { animation: fadeIn 0.15s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+    .table-dense th, .table-dense td { padding: 0.35rem 0.5rem; font-size: 0.8rem; }
+  </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200 min-h-screen">
+
+<div x-data="app()" x-init="init()" x-cloak class="flex flex-col min-h-screen">
+
+  <!-- ===== HEADER / NAVIGAZIONE ===== -->
+  <header class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 flex items-center justify-between h-12">
+      <h1 class="text-base font-bold text-primary-700 dark:text-primary-400 whitespace-nowrap">Gestione Affitti</h1>
+      <nav class="flex gap-1 overflow-x-auto text-sm">
+        <template x-for="v in viste" :key="v.id">
+          <button @click="vistaCorrente = v.id"
+                  :class="vistaCorrente === v.id ? 'bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300 font-semibold' : 'hover:bg-gray-100 dark:hover:bg-gray-700'"
+                  class="px-3 py-1.5 rounded-md whitespace-nowrap transition-colors"
+                  x-text="v.label"></button>
+        </template>
+      </nav>
+      <div class="flex items-center gap-2 text-xs">
+        <span x-show="statoSalvataggio === 'salvato'" class="text-green-600 dark:text-green-400">Salvato</span>
+        <span x-show="statoSalvataggio === 'salvataggio'" class="text-yellow-600 dark:text-yellow-400">Salvataggio...</span>
+        <span x-show="statoSalvataggio === 'errore'" class="text-red-600 dark:text-red-400">Errore salvataggio</span>
+        <template x-if="!supportaFSAccess">
+          <div class="flex gap-1">
+            <button @click="esportaJSON()" class="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-xs">Esporta JSON</button>
+            <button @click="$refs.importFile.click()" class="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-xs">Importa JSON</button>
+            <input type="file" x-ref="importFile" accept=".json" @change="importaJSON($event)" class="hidden">
+          </div>
+        </template>
+        <template x-if="supportaFSAccess && !fileHandle">
+          <button @click="apriFile()" class="px-2 py-1 bg-primary-500 text-white rounded text-xs">Apri dati.json</button>
+        </template>
+      </div>
+    </div>
+  </header>
+
+  <!-- ===== CONTENUTO PRINCIPALE ===== -->
+  <main class="flex-1 max-w-7xl mx-auto w-full px-4 py-4">
+
+    <!-- ========== 1. DASHBOARD ========== -->
+    <div x-show="vistaCorrente === 'dashboard'" class="page-enter">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-bold" x-text="'Dashboard — ' + nomeMeseCorrente()"></h2>
+        <div class="flex gap-4 text-sm">
+          <span class="font-semibold">Totale incassato: <span class="text-green-600 dark:text-green-400" x-text="formatValuta(totaleIncassatoMese())"></span></span>
+          <span class="font-semibold">Da incassare: <span class="text-yellow-600 dark:text-yellow-400" x-text="formatValuta(totaleDaIncassareMese())"></span></span>
+        </div>
+      </div>
+      <!-- Card proprieta -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
+        <template x-for="p in dati.proprieta" :key="p.id">
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 cursor-pointer hover:shadow-md transition-shadow"
+               @click="apriProprieta(p.id)">
+            <div class="flex items-center justify-between mb-2">
+              <h3 class="font-semibold text-sm" x-text="p.nome"></h3>
+              <span x-html="statoAffittoMese(p.id)" class="text-sm"></span>
+            </div>
+            <div class="text-xs text-gray-500 dark:text-gray-400 space-y-0.5">
+              <div>Affitto: <span class="font-medium text-gray-700 dark:text-gray-300" x-text="formatValuta(p.importoAffittoMensile)"></span></div>
+              <div>Scadenza: <span x-text="labelScadenza(p.scadenzaAffitto)"></span></div>
+              <div>Banca: <span x-text="nomeBanca(p.bancaIncasso) || '—'"></span></div>
+            </div>
+          </div>
+        </template>
+      </div>
+      <!-- Riepilogo giri per banca -->
+      <div class="mb-6">
+        <h3 class="text-sm font-bold mb-2">Da girare per banca destinazione</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <template x-for="b in dati.banche" :key="b.id">
+            <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3">
+              <div class="flex justify-between items-center">
+                <span class="font-semibold text-sm" x-text="b.nome + ' (' + b.intestatario + ')'"></span>
+                <span class="text-sm font-bold text-orange-600 dark:text-orange-400" x-text="formatValuta(totaleDaGirareBanca(b.id))"></span>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+      <!-- Utenze in scadenza -->
+      <div>
+        <h3 class="text-sm font-bold mb-2">Utenze in scadenza (prossimi 30 giorni)</h3>
+        <template x-if="utenzeInScadenza().length === 0">
+          <p class="text-xs text-gray-400">Nessuna utenza in scadenza</p>
+        </template>
+        <div class="overflow-x-auto">
+          <table x-show="utenzeInScadenza().length > 0" class="w-full table-dense bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+            <thead class="bg-gray-50 dark:bg-gray-750"><tr>
+              <th class="text-left">Proprieta</th><th class="text-left">Tipo</th><th class="text-left">Fornitore</th>
+              <th class="text-right">Importo</th><th class="text-left">Scadenza</th><th class="text-left">Stato</th>
+            </tr></thead>
+            <tbody>
+              <template x-for="u in utenzeInScadenza()" :key="u.id">
+                <tr class="border-t border-gray-100 dark:border-gray-700">
+                  <td x-text="nomeProprieta(u.proprietaId)"></td><td x-text="u.tipo"></td>
+                  <td x-text="u.fornitore || '—'"></td><td class="text-right" x-text="formatValuta(u.importo)"></td>
+                  <td x-text="formatData(u.dataScadenza)"></td><td x-html="badgeStatoUtenza(u.stato)"></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== 2. CALENDARIO ========== -->
+    <div x-show="vistaCorrente === 'calendario'" class="page-enter">
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-2">
+          <button @click="meseCalendario--; if(meseCalendario<0){meseCalendario=11;annoCalendario--}" class="px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 text-sm">&larr;</button>
+          <h2 class="text-lg font-bold" x-text="nomiMesi[meseCalendario] + ' ' + annoCalendario"></h2>
+          <button @click="meseCalendario++; if(meseCalendario>11){meseCalendario=0;annoCalendario++}" class="px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 text-sm">&rarr;</button>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <template x-for="gruppo in gruppiCalendario()" :key="gruppo.label">
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3">
+            <h3 class="font-bold text-sm mb-2 text-primary-600 dark:text-primary-400" x-text="gruppo.label"></h3>
+            <div class="space-y-2">
+              <template x-for="inc in gruppo.incassi" :key="inc.id">
+                <div class="flex items-center justify-between p-2 rounded-md"
+                     :class="inc.dataIncasso ? 'bg-green-50 dark:bg-green-900/30' : (isRitardo(inc) ? 'bg-red-50 dark:bg-red-900/30' : 'bg-gray-50 dark:bg-gray-700/50')">
+                  <div>
+                    <div class="text-sm font-medium" x-text="nomeProprieta(inc.proprietaId)"></div>
+                    <div class="text-xs text-gray-500" x-text="formatValuta(inc.importo)"></div>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span x-show="inc.dataIncasso" class="text-green-600 text-sm">&#10003;</span>
+                    <span x-show="!inc.dataIncasso && isRitardo(inc)" class="text-red-500 text-sm">&#9888;</span>
+                    <button x-show="!inc.dataIncasso" @click="segnaIncassatoOggi(inc)"
+                            class="px-2 py-1 text-xs bg-green-500 hover:bg-green-600 text-white rounded">Incassa oggi</button>
+                  </div>
+                </div>
+              </template>
+              <template x-if="gruppo.incassi.length === 0">
+                <p class="text-xs text-gray-400 italic">Nessun incasso</p>
+              </template>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- ========== 3. PROPRIETA (dettaglio) ========== -->
+    <div x-show="vistaCorrente === 'proprieta'" class="page-enter">
+      <template x-if="!proprietaSelezionata">
+        <div>
+          <h2 class="text-lg font-bold mb-4">Proprieta</h2>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <template x-for="p in dati.proprieta" :key="p.id">
+              <div @click="apriProprieta(p.id)"
+                   class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 cursor-pointer hover:shadow-md transition-shadow">
+                <h3 class="font-semibold" x-text="p.nome"></h3>
+                <div class="text-xs text-gray-500 mt-1" x-text="formatValuta(p.importoAffittoMensile) + '/mese — ' + p.intestatario"></div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </template>
+      <template x-if="proprietaSelezionata">
+        <div>
+          <button @click="proprietaSelezionata = null" class="text-sm text-primary-600 dark:text-primary-400 mb-3 hover:underline">&larr; Tutte le proprieta</button>
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 mb-4">
+            <h2 class="text-lg font-bold" x-text="getProprieta(proprietaSelezionata).nome"></h2>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2 text-xs">
+              <div>Tipo: <span class="font-medium" x-text="getProprieta(proprietaSelezionata).tipo"></span></div>
+              <div>Affitto: <span class="font-medium" x-text="formatValuta(getProprieta(proprietaSelezionata).importoAffittoMensile)"></span></div>
+              <div>Scadenza: <span class="font-medium" x-text="labelScadenza(getProprieta(proprietaSelezionata).scadenzaAffitto)"></span></div>
+              <div>Intestatario: <span class="font-medium" x-text="getProprieta(proprietaSelezionata).intestatario"></span></div>
+            </div>
+          </div>
+          <!-- Filtro anno -->
+          <div class="flex items-center gap-2 mb-3">
+            <label class="text-sm font-semibold">Anno:</label>
+            <select x-model.number="annoProprieta" class="text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600">
+              <template x-for="a in anniDisponibili()" :key="a"><option :value="a" x-text="a"></option></template>
+            </select>
+            <span class="text-sm ml-4">Totale incassi anno: <strong class="text-green-600 dark:text-green-400" x-text="formatValuta(totaleIncassiAnno(proprietaSelezionata, annoProprieta))"></strong></span>
+          </div>
+          <!-- Storico incassi -->
+          <h3 class="text-sm font-bold mb-2">Storico Incassi</h3>
+          <div class="overflow-x-auto mb-6">
+            <table class="w-full table-dense bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+              <thead class="bg-gray-50 dark:bg-gray-750"><tr>
+                <th class="text-left">Mese</th><th class="text-left">Data prevista</th><th class="text-left">Data incasso</th>
+                <th class="text-right">Importo</th><th class="text-left">Banca</th><th class="text-left">Girato</th><th class="text-left">Note</th>
+              </tr></thead>
+              <tbody>
+                <template x-for="inc in storicoIncassiProprieta(proprietaSelezionata, annoProprieta)" :key="inc.id">
+                  <tr class="border-t border-gray-100 dark:border-gray-700">
+                    <td x-text="inc.mese"></td><td x-text="formatData(inc.dataPrevista)"></td>
+                    <td x-text="inc.dataIncasso ? formatData(inc.dataIncasso) : '—'"></td>
+                    <td class="text-right" x-text="formatValuta(inc.importo)"></td>
+                    <td x-text="nomeBanca(inc.bancaId) || '—'"></td>
+                    <td x-text="inc.girato ? formatData(inc.dataGiro) : '—'"></td>
+                    <td x-text="inc.note || ''"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+          <!-- Storico utenze -->
+          <h3 class="text-sm font-bold mb-2">Storico Utenze</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full table-dense bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+              <thead class="bg-gray-50 dark:bg-gray-750"><tr>
+                <th class="text-left">Tipo</th><th class="text-left">Fornitore</th><th class="text-left">Periodo</th>
+                <th class="text-left">Scadenza</th><th class="text-right">Importo</th><th class="text-left">Stato</th>
+              </tr></thead>
+              <tbody>
+                <template x-for="u in storicoUtenzeProprieta(proprietaSelezionata, annoProprieta)" :key="u.id">
+                  <tr class="border-t border-gray-100 dark:border-gray-700">
+                    <td x-text="u.tipo"></td><td x-text="u.fornitore || '—'"></td>
+                    <td x-text="u.periodoRiferimento"></td><td x-text="formatData(u.dataScadenza)"></td>
+                    <td class="text-right" x-text="formatValuta(u.importo)"></td><td x-html="badgeStatoUtenza(u.stato)"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+          <div class="mt-2 text-sm">Totale utenze anno: <strong x-text="formatValuta(totaleUtenzeAnno(proprietaSelezionata, annoProprieta))"></strong></div>
+        </div>
+      </template>
+    </div>
+
+    <!-- ========== 4. MOVIMENTI BANCA ========== -->
+    <div x-show="vistaCorrente === 'banche'" class="page-enter">
+      <h2 class="text-lg font-bold mb-4">Movimenti Banca</h2>
+      <div class="flex items-center gap-2 mb-4">
+        <label class="text-sm">Mese:</label>
+        <input type="month" x-model="meseBanca" class="text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600">
+      </div>
+      <div class="space-y-6">
+        <template x-for="b in dati.banche" :key="b.id">
+          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <div class="flex justify-between items-center mb-3">
+              <h3 class="font-bold" x-text="b.nome + ' — ' + b.intestatario"></h3>
+              <div class="text-sm">
+                <span>Incassato: <strong class="text-green-600 dark:text-green-400" x-text="formatValuta(totaleIncassatoBancaMese(b.id))"></strong></span>
+                <span class="ml-4">Da girare: <strong class="text-orange-600 dark:text-orange-400" x-text="formatValuta(totaleDaGirareBancaMese(b.id))"></strong></span>
+              </div>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full table-dense">
+                <thead class="bg-gray-50 dark:bg-gray-750"><tr>
+                  <th class="text-left">Proprieta</th><th class="text-left">Data incasso</th><th class="text-right">Importo</th>
+                  <th class="text-left">Girato</th><th class="text-left">Banca dest.</th><th class="text-left">Azioni</th>
+                </tr></thead>
+                <tbody>
+                  <template x-for="inc in incassiBancaMese(b.id)" :key="inc.id">
+                    <tr class="border-t border-gray-100 dark:border-gray-700">
+                      <td x-text="nomeProprieta(inc.proprietaId)"></td>
+                      <td x-text="inc.dataIncasso ? formatData(inc.dataIncasso) : '—'"></td>
+                      <td class="text-right" x-text="formatValuta(inc.importo)"></td>
+                      <td x-text="inc.girato ? formatData(inc.dataGiro) : '—'"></td>
+                      <td x-text="inc.bancaDestinazioneId ? nomeBanca(inc.bancaDestinazioneId) : '—'"></td>
+                      <td>
+                        <template x-if="inc.dataIncasso && !inc.girato">
+                          <select @change="segnaGirato(inc, $event.target.value)" class="text-xs border rounded px-1 py-0.5 dark:bg-gray-700 dark:border-gray-600">
+                            <option value="">Gira a...</option>
+                            <template x-for="bd in dati.banche.filter(x => x.id !== b.id)" :key="bd.id">
+                              <option :value="bd.id" x-text="bd.nome"></option>
+                            </template>
+                          </select>
+                        </template>
+                        <template x-if="inc.girato"><span class="text-green-600 text-xs">&#10003;</span></template>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- ========== 5. UTENZE ========== -->
+    <div x-show="vistaCorrente === 'utenze'" class="page-enter">
+      <h2 class="text-lg font-bold mb-4">Utenze</h2>
+      <!-- Filtri -->
+      <div class="flex flex-wrap gap-3 mb-4">
+        <select x-model="filtroUtenzeProprieta" class="text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600">
+          <option value="">Tutte le proprieta</option>
+          <template x-for="p in dati.proprieta" :key="p.id"><option :value="p.id" x-text="p.nome"></option></template>
+        </select>
+        <select x-model="filtroUtenzeTipo" class="text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600">
+          <option value="">Tutti i tipi</option>
+          <option value="acqua">Acqua</option><option value="luce">Luce</option><option value="gas">Gas</option>
+        </select>
+        <select x-model="filtroUtenzeStato" class="text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600">
+          <option value="">Tutti gli stati</option>
+          <option value="da_ricevere">Da ricevere</option><option value="ricevuta">Ricevuta</option>
+          <option value="pagata">Pagata</option><option value="rimborsata_inquilino">Rimborsata</option>
+        </select>
+        <select x-model.number="filtroUtenzeAnno" class="text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600">
+          <template x-for="a in anniDisponibili()" :key="a"><option :value="a" x-text="a"></option></template>
+        </select>
+        <button @click="mostraFormUtenza = true" class="px-3 py-1 bg-primary-500 text-white rounded text-sm hover:bg-primary-600">+ Nuova utenza</button>
+      </div>
+      <!-- Form nuova utenza -->
+      <div x-show="mostraFormUtenza" class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 mb-4">
+        <h3 class="font-bold text-sm mb-3">Nuova Utenza</h3>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div><label class="text-xs">Proprieta</label>
+            <select x-model="nuovaUtenza.proprietaId" class="w-full text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600">
+              <template x-for="p in dati.proprieta" :key="p.id"><option :value="p.id" x-text="p.nome"></option></template>
+            </select></div>
+          <div><label class="text-xs">Tipo</label>
+            <select x-model="nuovaUtenza.tipo" class="w-full text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600">
+              <option value="acqua">Acqua</option><option value="luce">Luce</option><option value="gas">Gas</option>
+            </select></div>
+          <div><label class="text-xs">Fornitore</label>
+            <input type="text" x-model="nuovaUtenza.fornitore" class="w-full text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600"></div>
+          <div><label class="text-xs">Periodo</label>
+            <input type="text" x-model="nuovaUtenza.periodoRiferimento" placeholder="2026-Q1" class="w-full text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600"></div>
+          <div><label class="text-xs">Scadenza</label>
+            <input type="date" x-model="nuovaUtenza.dataScadenza" class="w-full text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600"></div>
+          <div><label class="text-xs">Importo</label>
+            <input type="number" step="0.01" x-model.number="nuovaUtenza.importo" class="w-full text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600"></div>
+          <div><label class="text-xs">Stato</label>
+            <select x-model="nuovaUtenza.stato" class="w-full text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600">
+              <option value="da_ricevere">Da ricevere</option><option value="ricevuta">Ricevuta</option>
+              <option value="pagata">Pagata</option><option value="rimborsata_inquilino">Rimborsata</option>
+            </select></div>
+          <div><label class="text-xs">Note</label>
+            <input type="text" x-model="nuovaUtenza.note" class="w-full text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600"></div>
+        </div>
+        <div class="flex gap-2 mt-3">
+          <button @click="aggiungiUtenza()" class="px-3 py-1 bg-green-500 text-white rounded text-sm">Salva</button>
+          <button @click="mostraFormUtenza = false" class="px-3 py-1 bg-gray-300 dark:bg-gray-600 rounded text-sm">Annulla</button>
+        </div>
+      </div>
+      <!-- Tabella utenze -->
+      <div class="overflow-x-auto">
+        <table class="w-full table-dense bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+          <thead class="bg-gray-50 dark:bg-gray-750"><tr>
+            <th class="text-left">Proprieta</th><th class="text-left">Tipo</th><th class="text-left">Fornitore</th>
+            <th class="text-left">Periodo</th><th class="text-left">Scadenza</th><th class="text-right">Importo</th>
+            <th class="text-left">Stato</th><th class="text-left">Azioni</th>
+          </tr></thead>
+          <tbody>
+            <template x-for="u in utenzeFiltrate()" :key="u.id">
+              <tr class="border-t border-gray-100 dark:border-gray-700">
+                <td x-text="nomeProprieta(u.proprietaId)"></td><td x-text="u.tipo"></td>
+                <td x-text="u.fornitore || '—'"></td><td x-text="u.periodoRiferimento"></td>
+                <td x-text="formatData(u.dataScadenza)"></td><td class="text-right" x-text="formatValuta(u.importo)"></td>
+                <td x-html="badgeStatoUtenza(u.stato)"></td>
+                <td>
+                  <select @change="cambiaStatoUtenza(u, $event.target.value); $event.target.value = ''"
+                          class="text-xs border rounded px-1 py-0.5 dark:bg-gray-700 dark:border-gray-600">
+                    <option value="">Cambia stato...</option>
+                    <option value="da_ricevere">Da ricevere</option><option value="ricevuta">Ricevuta</option>
+                    <option value="pagata">Pagata</option><option value="rimborsata_inquilino">Rimborsata</option>
+                  </select>
+                  <button @click="eliminaUtenza(u.id)" class="text-xs text-red-500 hover:text-red-700 ml-1" title="Elimina">&#10005;</button>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+          <tfoot class="bg-gray-50 dark:bg-gray-750 font-semibold"><tr>
+            <td colspan="5" class="text-right text-xs">Totale:</td>
+            <td class="text-right text-xs" x-text="formatValuta(totaleUtenzeFiltrate())"></td>
+            <td colspan="2"></td>
+          </tr></tfoot>
+        </table>
+      </div>
+    </div>
+
+    <!-- ========== 6. IMPOSTAZIONI ========== -->
+    <div x-show="vistaCorrente === 'impostazioni'" class="page-enter">
+      <h2 class="text-lg font-bold mb-4">Impostazioni</h2>
+
+      <!-- Gestione Proprieta -->
+      <div class="mb-8">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="font-bold">Proprieta</h3>
+          <button @click="mostraFormProprieta = true; editProprieta = creaProprieta()" class="px-3 py-1 bg-primary-500 text-white rounded text-sm">+ Nuova</button>
+        </div>
+        <div x-show="mostraFormProprieta" class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 mb-4">
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div><label class="text-xs">Nome</label>
+              <input type="text" x-model="editProprieta.nome" class="w-full text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600"></div>
+            <div><label class="text-xs">Tipo</label>
+              <select x-model="editProprieta.tipo" class="w-full text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600">
+                <option value="appartamento">Appartamento</option><option value="altro">Altro</option>
+              </select></div>
+            <div><label class="text-xs">Scadenza affitto</label>
+              <select x-model="editProprieta.scadenzaAffitto" class="w-full text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600">
+                <option value="1">Giorno 1</option><option value="15">Giorno 15</option><option value="fine_mese">Fine mese</option>
+              </select></div>
+            <div><label class="text-xs">Importo mensile</label>
+              <input type="number" step="0.01" x-model.number="editProprieta.importoAffittoMensile" class="w-full text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600"></div>
+            <div><label class="text-xs">Banca incasso</label>
+              <select x-model="editProprieta.bancaIncasso" class="w-full text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600">
+                <option value="">—</option>
+                <template x-for="b in dati.banche" :key="b.id"><option :value="b.id" x-text="b.nome"></option></template>
+              </select></div>
+            <div><label class="text-xs">Intestatario</label>
+              <input type="text" x-model="editProprieta.intestatario" class="w-full text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600"></div>
+            <div><label class="text-xs">Banca destinazione</label>
+              <select x-model="editProprieta.bancaDestinazione" class="w-full text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600">
+                <option value="">—</option>
+                <template x-for="b in dati.banche" :key="b.id"><option :value="b.id" x-text="b.nome"></option></template>
+              </select></div>
+            <div><label class="text-xs">Note</label>
+              <input type="text" x-model="editProprieta.note" class="w-full text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600"></div>
+          </div>
+          <div class="flex gap-2 mt-3">
+            <button @click="salvaProprieta()" class="px-3 py-1 bg-green-500 text-white rounded text-sm">Salva</button>
+            <button @click="mostraFormProprieta = false" class="px-3 py-1 bg-gray-300 dark:bg-gray-600 rounded text-sm">Annulla</button>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full table-dense bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+            <thead class="bg-gray-50 dark:bg-gray-750"><tr>
+              <th class="text-left">Nome</th><th class="text-left">Tipo</th><th class="text-left">Scadenza</th>
+              <th class="text-right">Importo</th><th class="text-left">Banca</th><th class="text-left">Intestatario</th><th class="text-left">Azioni</th>
+            </tr></thead>
+            <tbody>
+              <template x-for="p in dati.proprieta" :key="p.id">
+                <tr class="border-t border-gray-100 dark:border-gray-700">
+                  <td class="font-medium" x-text="p.nome"></td><td x-text="p.tipo"></td>
+                  <td x-text="labelScadenza(p.scadenzaAffitto)"></td>
+                  <td class="text-right" x-text="formatValuta(p.importoAffittoMensile)"></td>
+                  <td x-text="nomeBanca(p.bancaIncasso) || '—'"></td><td x-text="p.intestatario"></td>
+                  <td>
+                    <button @click="modificaProprieta(p)" class="text-xs text-primary-600 hover:underline">Modifica</button>
+                    <button @click="eliminaProprieta(p.id)" class="text-xs text-red-500 hover:underline ml-2">Elimina</button>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Gestione Banche -->
+      <div>
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="font-bold">Banche</h3>
+          <button @click="mostraFormBanca = true; editBanca = creaBanca()" class="px-3 py-1 bg-primary-500 text-white rounded text-sm">+ Nuova</button>
+        </div>
+        <div x-show="mostraFormBanca" class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 mb-4">
+          <div class="grid grid-cols-2 gap-3">
+            <div><label class="text-xs">Nome banca</label>
+              <input type="text" x-model="editBanca.nome" class="w-full text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600"></div>
+            <div><label class="text-xs">Intestatario</label>
+              <input type="text" x-model="editBanca.intestatario" class="w-full text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600"></div>
+          </div>
+          <div class="flex gap-2 mt-3">
+            <button @click="salvaBanca()" class="px-3 py-1 bg-green-500 text-white rounded text-sm">Salva</button>
+            <button @click="mostraFormBanca = false" class="px-3 py-1 bg-gray-300 dark:bg-gray-600 rounded text-sm">Annulla</button>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full table-dense bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+            <thead class="bg-gray-50 dark:bg-gray-750"><tr>
+              <th class="text-left">Nome</th><th class="text-left">Intestatario</th><th class="text-left">Azioni</th>
+            </tr></thead>
+            <tbody>
+              <template x-for="b in dati.banche" :key="b.id">
+                <tr class="border-t border-gray-100 dark:border-gray-700">
+                  <td class="font-medium" x-text="b.nome"></td><td x-text="b.intestatario"></td>
+                  <td>
+                    <button @click="modificaBanca(b)" class="text-xs text-primary-600 hover:underline">Modifica</button>
+                    <button @click="eliminaBanca(b.id)" class="text-xs text-red-500 hover:underline ml-2">Elimina</button>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </main>
+  <footer class="text-center text-xs text-gray-400 py-2">Gestione Affitti &amp; Utenze v1.0</footer>
+</div>
+
+<!-- ============================================================
+     LOGICA APPLICATIVA
+     ============================================================ -->
+<script>
+/** Genera un ID univoco breve */
+function uid() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 6); }
+
+/** Formatta importo in euro con separatori italiani */
+function formatValuta(n) {
+  if (n == null || isNaN(n)) return '0,00 \u20AC';
+  return n.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' });
+}
+
+/** Formatta data ISO in gg/mm/aaaa */
+function formatData(d) {
+  if (!d) return '\u2014';
+  const [y, m, g] = d.split('-');
+  return g + '/' + m + '/' + y;
+}
+
+/** Data odierna ISO */
+function oggi() { return new Date().toISOString().split('T')[0]; }
+
+/** Mese corrente YYYY-MM */
+function meseCorrente() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
+
+/** Calcola data prevista per incasso */
+function dataPrevist(mese, scadenza) {
+  const [y, m] = mese.split('-').map(Number);
+  if (scadenza === 'fine_mese') {
+    const ultimo = new Date(y, m, 0).getDate();
+    return y + '-' + String(m).padStart(2, '0') + '-' + String(ultimo).padStart(2, '0');
+  }
+  const g = parseInt(scadenza) || 1;
+  return y + '-' + String(m).padStart(2, '0') + '-' + String(g).padStart(2, '0');
+}
+
+/** Dati di esempio iniziali */
+function datiEsempio() {
+  const bBPM = { id: uid(), nome: 'BPM', intestatario: 'Stefano Desio' };
+  const bBPER = { id: uid(), nome: 'BPER', intestatario: 'Gina Desio' };
+  const nomi = ['Via Guelfa','Via Dei Servi','Elba 508','Elba 626','Follonica Bicocchi','Franklin 214','Sweetzer 201','Ghibellina 101','Larrabee 116'];
+  const importi = [800,900,750,650,1000,1200,1100,850,950];
+  const proprieta = nomi.map((nome, i) => ({
+    id: uid(), nome, tipo: 'appartamento',
+    scadenzaAffitto: i % 3 === 0 ? '1' : (i % 3 === 1 ? '15' : 'fine_mese'),
+    importoAffittoMensile: importi[i],
+    bancaIncasso: i % 2 === 0 ? bBPM.id : bBPER.id,
+    intestatario: i % 2 === 0 ? 'Stefano Desio' : 'Gina Desio',
+    bancaDestinazione: i % 2 === 0 ? bBPER.id : bBPM.id,
+    note: ''
+  }));
+  return { proprieta, banche: [bBPM, bBPER], incassiAffitti: [], utenze: [] };
+}
+
+// ---------- Componente Alpine principale ----------
+function app() {
+  return {
+    viste: [
+      { id: 'dashboard', label: 'Dashboard' },
+      { id: 'calendario', label: 'Calendario' },
+      { id: 'proprieta', label: 'Propriet\u00E0' },
+      { id: 'banche', label: 'Banche' },
+      { id: 'utenze', label: 'Utenze' },
+      { id: 'impostazioni', label: 'Impostazioni' }
+    ],
+    vistaCorrente: 'dashboard',
+    nomiMesi: ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'],
+    dati: { proprieta: [], banche: [], incassiAffitti: [], utenze: [] },
+    fileHandle: null,
+    supportaFSAccess: !!window.showOpenFilePicker,
+    statoSalvataggio: 'salvato',
+    proprietaSelezionata: null,
+    annoProprieta: new Date().getFullYear(),
+    meseCalendario: new Date().getMonth(),
+    annoCalendario: new Date().getFullYear(),
+    meseBanca: meseCorrente(),
+    filtroUtenzeProprieta: '', filtroUtenzeTipo: '', filtroUtenzeStato: '',
+    filtroUtenzeAnno: new Date().getFullYear(),
+    mostraFormUtenza: false, nuovaUtenza: {},
+    mostraFormProprieta: false, editProprieta: {},
+    mostraFormBanca: false, editBanca: {},
+
+    async init() {
+      const saved = localStorage.getItem('gestione_affitti_dati');
+      if (saved) { try { this.dati = JSON.parse(saved); } catch(e) {} }
+      if (!this.dati.proprieta || this.dati.proprieta.length === 0) { this.dati = datiEsempio(); }
+      this.generaIncassiAttesi();
+      this.resetFormUtenza();
+      await this.salva();
+    },
+
+    // --- Persistenza ---
+    async apriFile() {
+      try {
+        const [handle] = await window.showOpenFilePicker({
+          types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }], multiple: false
+        });
+        this.fileHandle = handle;
+        const file = await handle.getFile();
+        const testo = await file.text();
+        if (testo.trim()) { this.dati = JSON.parse(testo); this.generaIncassiAttesi(); }
+        this.statoSalvataggio = 'salvato';
+      } catch(e) { if (e.name !== 'AbortError') console.error('Errore apertura file:', e); }
+    },
+
+    async salva() {
+      this.statoSalvataggio = 'salvataggio';
+      try {
+        const json = JSON.stringify(this.dati, null, 2);
+        localStorage.setItem('gestione_affitti_dati', json);
+        if (this.fileHandle) {
+          const writable = await this.fileHandle.createWritable();
+          await writable.write(json); await writable.close();
+        }
+        this.statoSalvataggio = 'salvato';
+      } catch(e) { console.error('Errore salvataggio:', e); this.statoSalvataggio = 'errore'; }
+    },
+
+    esportaJSON() {
+      const blob = new Blob([JSON.stringify(this.dati, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = 'dati.json'; a.click();
+      URL.revokeObjectURL(a.href);
+    },
+
+    async importaJSON(event) {
+      const file = event.target.files[0]; if (!file) return;
+      try { this.dati = JSON.parse(await file.text()); this.generaIncassiAttesi(); await this.salva();
+      } catch(e) { alert('Errore nel file JSON: ' + e.message); }
+    },
+
+    // --- Generazione automatica incassi ---
+    generaIncassiAttesi() {
+      const adesso = new Date();
+      const mesi = [meseCorrente()];
+      if (adesso.getDate() >= 20) {
+        let mm = adesso.getMonth() + 2, yy = adesso.getFullYear();
+        if (mm > 12) { mm = 1; yy++; }
+        mesi.push(yy + '-' + String(mm).padStart(2, '0'));
+      }
+      for (const mese of mesi) {
+        for (const prop of this.dati.proprieta) {
+          if (this.dati.incassiAffitti.some(i => i.proprietaId === prop.id && i.mese === mese)) continue;
+          if (prop.importoAffittoMensile > 0) {
+            this.dati.incassiAffitti.push({
+              id: uid(), proprietaId: prop.id, mese,
+              dataPrevista: dataPrevist(mese, prop.scadenzaAffitto),
+              dataIncasso: null, importo: prop.importoAffittoMensile,
+              bancaId: prop.bancaIncasso, girato: false,
+              dataGiro: null, bancaDestinazioneId: null, note: ''
+            });
+          }
+        }
+      }
+    },
+
+    // --- Lookup ---
+    nomeProprieta(id) { const p = this.dati.proprieta.find(x => x.id === id); return p ? p.nome : '\u2014'; },
+    getProprieta(id) { return this.dati.proprieta.find(x => x.id === id) || {}; },
+    nomeBanca(id) { const b = this.dati.banche.find(x => x.id === id); return b ? b.nome : ''; },
+    labelScadenza(s) { return s === 'fine_mese' ? 'Fine mese' : 'Giorno ' + s; },
+    nomeMeseCorrente() { const d = new Date(); return this.nomiMesi[d.getMonth()] + ' ' + d.getFullYear(); },
+
+    // --- Dashboard ---
+    incassiMeseCorrente() { const mc = meseCorrente(); return this.dati.incassiAffitti.filter(i => i.mese === mc); },
+    totaleIncassatoMese() { return this.incassiMeseCorrente().filter(i => i.dataIncasso).reduce((s, i) => s + (i.importo || 0), 0); },
+    totaleDaIncassareMese() { return this.incassiMeseCorrente().filter(i => !i.dataIncasso).reduce((s, i) => s + (i.importo || 0), 0); },
+    statoAffittoMese(propId) {
+      const inc = this.dati.incassiAffitti.find(i => i.proprietaId === propId && i.mese === meseCorrente());
+      if (!inc) return '<span class="text-gray-400">\u2014</span>';
+      if (inc.dataIncasso) return '<span class="text-green-600" title="Incassato">\u2705</span>';
+      if (this.isRitardo(inc)) return '<span class="text-red-500" title="In ritardo">\u26A0\uFE0F</span>';
+      return '<span class="text-yellow-500" title="Atteso">\u23F3</span>';
+    },
+    isRitardo(inc) { return !inc.dataIncasso && inc.dataPrevista < oggi(); },
+    totaleDaGirareBanca(bancaId) {
+      return this.dati.incassiAffitti.filter(i => i.bancaId === bancaId && i.dataIncasso && !i.girato).reduce((s, i) => s + (i.importo || 0), 0);
+    },
+    utenzeInScadenza() {
+      const lim = new Date(); lim.setDate(lim.getDate() + 30);
+      const limISO = lim.toISOString().split('T')[0], oggiISO = oggi();
+      return this.dati.utenze
+        .filter(u => u.dataScadenza && u.dataScadenza >= oggiISO && u.dataScadenza <= limISO && u.stato !== 'pagata' && u.stato !== 'rimborsata_inquilino')
+        .sort((a, b) => a.dataScadenza.localeCompare(b.dataScadenza));
+    },
+    badgeStatoUtenza(stato) {
+      const m = {
+        'da_ricevere': '<span class="px-1.5 py-0.5 rounded text-xs bg-gray-200 dark:bg-gray-600">Da ricevere</span>',
+        'ricevuta': '<span class="px-1.5 py-0.5 rounded text-xs bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200">Ricevuta</span>',
+        'pagata': '<span class="px-1.5 py-0.5 rounded text-xs bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">Pagata</span>',
+        'rimborsata_inquilino': '<span class="px-1.5 py-0.5 rounded text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">Rimborsata</span>'
+      };
+      return m[stato] || stato;
+    },
+
+    // --- Calendario ---
+    gruppiCalendario() {
+      const mese = this.annoCalendario + '-' + String(this.meseCalendario + 1).padStart(2, '0');
+      const incM = this.dati.incassiAffitti.filter(i => i.mese === mese);
+      const g1 = [], g15 = [], gfine = [];
+      for (const inc of incM) {
+        const prop = this.dati.proprieta.find(p => p.id === inc.proprietaId);
+        if (!prop) continue;
+        if (prop.scadenzaAffitto === '1') g1.push(inc);
+        else if (prop.scadenzaAffitto === '15') g15.push(inc);
+        else gfine.push(inc);
+      }
+      return [{ label: 'Giorno 1', incassi: g1 }, { label: 'Giorno 15', incassi: g15 }, { label: 'Fine mese', incassi: gfine }];
+    },
+    segnaIncassatoOggi(inc) { inc.dataIncasso = oggi(); this.salva(); },
+
+    // --- Proprieta dettaglio ---
+    apriProprieta(id) { this.proprietaSelezionata = id; this.vistaCorrente = 'proprieta'; },
+    anniDisponibili() { const a = new Date().getFullYear(); return [a - 2, a - 1, a, a + 1]; },
+    storicoIncassiProprieta(propId, anno) {
+      return this.dati.incassiAffitti.filter(i => i.proprietaId === propId && i.mese.startsWith(String(anno)))
+        .sort((a, b) => b.dataPrevista.localeCompare(a.dataPrevista));
+    },
+    totaleIncassiAnno(propId, anno) {
+      return this.storicoIncassiProprieta(propId, anno).filter(i => i.dataIncasso).reduce((s, i) => s + (i.importo || 0), 0);
+    },
+    storicoUtenzeProprieta(propId, anno) {
+      return this.dati.utenze.filter(u => u.proprietaId === propId && u.dataScadenza && u.dataScadenza.startsWith(String(anno)))
+        .sort((a, b) => b.dataScadenza.localeCompare(a.dataScadenza));
+    },
+    totaleUtenzeAnno(propId, anno) {
+      return this.storicoUtenzeProprieta(propId, anno).reduce((s, u) => s + (u.importo || 0), 0);
+    },
+
+    // --- Movimenti banca ---
+    incassiBancaMese(bancaId) {
+      return this.dati.incassiAffitti.filter(i => i.bancaId === bancaId && i.mese === this.meseBanca)
+        .sort((a, b) => (a.dataPrevista || '').localeCompare(b.dataPrevista || ''));
+    },
+    totaleIncassatoBancaMese(bancaId) {
+      return this.incassiBancaMese(bancaId).filter(i => i.dataIncasso).reduce((s, i) => s + (i.importo || 0), 0);
+    },
+    totaleDaGirareBancaMese(bancaId) {
+      return this.incassiBancaMese(bancaId).filter(i => i.dataIncasso && !i.girato).reduce((s, i) => s + (i.importo || 0), 0);
+    },
+    segnaGirato(inc, bancaDestId) {
+      if (!bancaDestId) return;
+      inc.girato = true; inc.dataGiro = oggi(); inc.bancaDestinazioneId = bancaDestId; this.salva();
+    },
+
+    // --- Utenze ---
+    resetFormUtenza() {
+      this.nuovaUtenza = {
+        proprietaId: this.dati.proprieta.length > 0 ? this.dati.proprieta[0].id : '',
+        tipo: 'acqua', fornitore: '', periodoRiferimento: '',
+        dataScadenza: '', importo: 0, stato: 'da_ricevere', note: ''
+      };
+    },
+    utenzeFiltrate() {
+      return this.dati.utenze.filter(u => {
+        if (this.filtroUtenzeProprieta && u.proprietaId !== this.filtroUtenzeProprieta) return false;
+        if (this.filtroUtenzeTipo && u.tipo !== this.filtroUtenzeTipo) return false;
+        if (this.filtroUtenzeStato && u.stato !== this.filtroUtenzeStato) return false;
+        if (this.filtroUtenzeAnno && u.dataScadenza && !u.dataScadenza.startsWith(String(this.filtroUtenzeAnno))) return false;
+        return true;
+      }).sort((a, b) => (b.dataScadenza || '').localeCompare(a.dataScadenza || ''));
+    },
+    totaleUtenzeFiltrate() { return this.utenzeFiltrate().reduce((s, u) => s + (u.importo || 0), 0); },
+    aggiungiUtenza() {
+      this.dati.utenze.push({ id: uid(), ...this.nuovaUtenza });
+      this.mostraFormUtenza = false; this.resetFormUtenza(); this.salva();
+    },
+    cambiaStatoUtenza(u, stato) {
+      if (!stato) return; u.stato = stato;
+      if (stato === 'pagata') u.dataPagamento = oggi();
+      this.salva();
+    },
+    eliminaUtenza(id) {
+      if (!confirm('Eliminare questa utenza?')) return;
+      this.dati.utenze = this.dati.utenze.filter(u => u.id !== id); this.salva();
+    },
+
+    // --- Impostazioni: Proprieta ---
+    creaProprieta() {
+      return { id: null, nome: '', tipo: 'appartamento', scadenzaAffitto: '1',
+        importoAffittoMensile: 0, bancaIncasso: '', intestatario: '', bancaDestinazione: '', note: '' };
+    },
+    modificaProprieta(p) { this.editProprieta = { ...p }; this.mostraFormProprieta = true; },
+    salvaProprieta() {
+      if (!this.editProprieta.nome) return alert('Inserire il nome');
+      if (this.editProprieta.id) {
+        const idx = this.dati.proprieta.findIndex(p => p.id === this.editProprieta.id);
+        if (idx >= 0) this.dati.proprieta[idx] = { ...this.editProprieta };
+      } else { this.editProprieta.id = uid(); this.dati.proprieta.push({ ...this.editProprieta }); }
+      this.mostraFormProprieta = false; this.generaIncassiAttesi(); this.salva();
+    },
+    eliminaProprieta(id) {
+      if (!confirm('Eliminare questa proprieta e tutti i dati collegati?')) return;
+      this.dati.proprieta = this.dati.proprieta.filter(p => p.id !== id);
+      this.dati.incassiAffitti = this.dati.incassiAffitti.filter(i => i.proprietaId !== id);
+      this.dati.utenze = this.dati.utenze.filter(u => u.proprietaId !== id);
+      this.salva();
+    },
+
+    // --- Impostazioni: Banche ---
+    creaBanca() { return { id: null, nome: '', intestatario: '' }; },
+    modificaBanca(b) { this.editBanca = { ...b }; this.mostraFormBanca = true; },
+    salvaBanca() {
+      if (!this.editBanca.nome) return alert('Inserire il nome della banca');
+      if (this.editBanca.id) {
+        const idx = this.dati.banche.findIndex(b => b.id === this.editBanca.id);
+        if (idx >= 0) this.dati.banche[idx] = { ...this.editBanca };
+      } else { this.editBanca.id = uid(); this.dati.banche.push({ ...this.editBanca }); }
+      this.mostraFormBanca = false; this.salva();
+    },
+    eliminaBanca(id) {
+      if (!confirm('Eliminare questa banca?')) return;
+      this.dati.banche = this.dati.banche.filter(b => b.id !== id); this.salva();
+    },
+
+    formatValuta, formatData
+  };
+}
+</script>
+</body>
+</html>
