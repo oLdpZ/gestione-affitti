@@ -29,3 +29,11 @@ Web app single-page in italiano per la gestione affitti immobili e utenze.
 Apri [https://oldpz.github.io/gestione-affitti/](https://oldpz.github.io/gestione-affitti/) da qualsiasi browser.
 
 I dati sono salvati nel localStorage del browser. Per sincronizzare tra dispositivi usa i pulsanti **Esporta JSON** / **Importa JSON**, oppure su Chrome/Edge il pulsante **Apri dati.json** per leggere/scrivere su iCloud Drive o Dropbox.
+
+## Tutorial
+
+Guida completa passo-passo con istruzioni per ogni sezione dell'app:
+
+**[Leggi il tutorial](TUTORIAL.md)**
+
+Contenuti: primo avvio, registrare incassi, calendario, scheda proprietà, giro fondi tra banche, gestione utenze, impostazioni, salvataggio e sincronizzazione dati, FAQ.
