@@ -140,6 +140,9 @@
           <h2 class="text-lg font-bold" x-text="nomiMesi[meseCalendario] + ' ' + annoCalendario"></h2>
           <button @click="meseCalendario++; if(meseCalendario>11){meseCalendario=0;annoCalendario++}" class="px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 text-sm">&rarr;</button>
         </div>
+        <div class="flex gap-2">
+          <button @click="generaIncassiMeseVisualizzato()" class="px-3 py-1 bg-primary-500 hover:bg-primary-600 text-white rounded text-xs">+ Genera incassi mancanti</button>
+        </div>
       </div>
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <template x-for="gruppo in gruppiCalendario()" :key="gruppo.label">
@@ -149,15 +152,17 @@
               <template x-for="inc in gruppo.incassi" :key="inc.id">
                 <div class="flex items-center justify-between p-2 rounded-md"
                      :class="inc.dataIncasso ? 'bg-green-50 dark:bg-green-900/30' : (isRitardo(inc) ? 'bg-red-50 dark:bg-red-900/30' : 'bg-gray-50 dark:bg-gray-700/50')">
-                  <div>
-                    <div class="text-sm font-medium" x-text="nomeProprieta(inc.proprietaId)"></div>
-                    <div class="text-xs text-gray-500" x-text="formatValuta(inc.importo)"></div>
+                  <div class="flex-1 min-w-0">
+                    <div class="text-sm font-medium truncate" x-text="nomeProprieta(inc.proprietaId)"></div>
+                    <div class="text-xs text-gray-500" x-text="formatValuta(inc.importo) + (inc.dataIncasso ? ' — ' + formatData(inc.dataIncasso) : '')"></div>
                   </div>
-                  <div class="flex items-center gap-2">
+                  <div class="flex items-center gap-1 ml-2">
                     <span x-show="inc.dataIncasso" class="text-green-600 text-sm">&#10003;</span>
                     <span x-show="!inc.dataIncasso && isRitardo(inc)" class="text-red-500 text-sm">&#9888;</span>
                     <button x-show="!inc.dataIncasso" @click="segnaIncassatoOggi(inc)"
                             class="px-2 py-1 text-xs bg-green-500 hover:bg-green-600 text-white rounded">Incassa oggi</button>
+                    <button @click="apriFormIncasso(inc)" class="px-2 py-1 text-xs bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 rounded" title="Modifica">&#9998;</button>
+                    <button @click="eliminaIncasso(inc.id)" class="px-2 py-1 text-xs text-red-500 hover:text-red-700" title="Elimina">&#10005;</button>
                   </div>
                 </div>
               </template>
@@ -167,6 +172,52 @@
             </div>
           </div>
         </template>
+      </div>
+
+      <!-- Modal modifica incasso -->
+      <div x-show="incassoInModifica" x-cloak class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-lg p-4 w-full max-w-md" @click.away="incassoInModifica = null">
+          <h3 class="font-bold text-base mb-3">Modifica incasso</h3>
+          <template x-if="incassoInModifica">
+            <div class="space-y-3">
+              <div>
+                <label class="text-xs text-gray-500">Proprieta</label>
+                <div class="font-medium" x-text="nomeProprieta(incassoInModifica.proprietaId)"></div>
+              </div>
+              <div>
+                <label class="text-xs">Mese (YYYY-MM)</label>
+                <input type="month" x-model="incassoInModifica.mese" class="w-full text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600">
+              </div>
+              <div>
+                <label class="text-xs">Data prevista</label>
+                <input type="date" x-model="incassoInModifica.dataPrevista" class="w-full text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600">
+              </div>
+              <div>
+                <label class="text-xs">Data incasso (lascia vuoto se non ancora incassato)</label>
+                <input type="date" x-model="incassoInModifica.dataIncasso" class="w-full text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600">
+              </div>
+              <div>
+                <label class="text-xs">Importo (€)</label>
+                <input type="number" step="0.01" x-model.number="incassoInModifica.importo" class="w-full text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600">
+              </div>
+              <div>
+                <label class="text-xs">Banca incasso</label>
+                <select x-model="incassoInModifica.bancaId" class="w-full text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600">
+                  <option value="">—</option>
+                  <template x-for="b in dati.banche" :key="b.id"><option :value="b.id" x-text="b.nome"></option></template>
+                </select>
+              </div>
+              <div>
+                <label class="text-xs">Note</label>
+                <input type="text" x-model="incassoInModifica.note" class="w-full text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600">
+              </div>
+              <div class="flex gap-2 pt-2">
+                <button @click="salvaIncassoModificato()" class="px-3 py-1 bg-green-500 text-white rounded text-sm">Salva</button>
+                <button @click="incassoInModifica = null" class="px-3 py-1 bg-gray-300 dark:bg-gray-600 rounded text-sm">Annulla</button>
+              </div>
+            </div>
+          </template>
+        </div>
       </div>
     </div>
 
@@ -587,6 +638,7 @@ function app() {
     meseCalendario: new Date().getMonth(),
     annoCalendario: new Date().getFullYear(),
     meseBanca: meseCorrente(),
+    incassoInModifica: null,
     filtroUtenzeProprieta: '', filtroUtenzeTipo: '', filtroUtenzeStato: '',
     filtroUtenzeAnno: new Date().getFullYear(),
     mostraFormUtenza: false, nuovaUtenza: {},
@@ -738,6 +790,46 @@ function app() {
       return [{ label: 'Giorno 1', incassi: g1 }, { label: 'Giorno 15', incassi: g15 }, { label: 'Fine mese', incassi: gfine }];
     },
     segnaIncassatoOggi(inc) { inc.dataIncasso = oggi(); this.salva(); },
+
+    // Genera incassi mancanti per il mese attualmente visualizzato nel calendario
+    // (utile per mesi passati o futuri non ancora auto-generati)
+    generaIncassiMeseVisualizzato() {
+      const mese = this.annoCalendario + '-' + String(this.meseCalendario + 1).padStart(2, '0');
+      let creati = 0;
+      for (const prop of this.dati.proprieta) {
+        const esiste = this.dati.incassiAffitti.some(i => i.proprietaId === prop.id && i.mese === mese);
+        if (esiste || !(prop.importoAffittoMensile > 0)) continue;
+        this.dati.incassiAffitti.push({
+          id: uid(), proprietaId: prop.id, mese,
+          dataPrevista: dataPrevist(mese, prop.scadenzaAffitto),
+          dataIncasso: null, importo: prop.importoAffittoMensile,
+          bancaId: prop.bancaIncasso, girato: false,
+          dataGiro: null, bancaDestinazioneId: null, note: ''
+        });
+        creati++;
+      }
+      if (creati === 0) alert('Nessun incasso da creare: sono tutti gia presenti per ' + mese);
+      else this.salva();
+    },
+
+    // Modifica incasso esistente tramite modal
+    apriFormIncasso(inc) { this.incassoInModifica = { ...inc }; },
+    salvaIncassoModificato() {
+      if (!this.incassoInModifica) return;
+      const idx = this.dati.incassiAffitti.findIndex(i => i.id === this.incassoInModifica.id);
+      if (idx >= 0) {
+        // Se dataIncasso e stringa vuota, convertila in null
+        if (this.incassoInModifica.dataIncasso === '') this.incassoInModifica.dataIncasso = null;
+        this.dati.incassiAffitti[idx] = { ...this.incassoInModifica };
+        this.salva();
+      }
+      this.incassoInModifica = null;
+    },
+    eliminaIncasso(id) {
+      if (!confirm('Eliminare questo incasso?')) return;
+      this.dati.incassiAffitti = this.dati.incassiAffitti.filter(i => i.id !== id);
+      this.salva();
+    },
 
     // --- Proprieta dettaglio ---
     apriProprieta(id) { this.proprietaSelezionata = id; this.vistaCorrente = 'proprieta'; },
