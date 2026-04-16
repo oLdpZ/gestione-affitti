@@ -6,8 +6,18 @@
   <title>Gestione Affitti &amp; Utenze</title>
   <!-- Tailwind CSS via CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Alpine.js per reattivita -->
+  <!-- Supabase JS client (auth + DB) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Alpine.js per reattivita (deve caricarsi DOPO Supabase) -->
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <script>
+    // ====== CONFIGURAZIONE SUPABASE ======
+    // URL e chiave pubblica del progetto. La chiave anon/public e SICURA da condividere:
+    // la Row Level Security protegge i dati a livello database.
+    const SUPABASE_URL = 'https://bavkwjxngwzggahdwcjr.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJhdmt3anhuZ3d6Z2dhaGR3Y2pyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzNjY1MDUsImV4cCI6MjA5MTk0MjUwNX0.cdKrScUz40_9nUGfSpqpfMQeEC3B9mP209ANM2L1VcM';
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  </script>
   <script>
     tailwind.config = {
       darkMode: 'media',
@@ -33,6 +43,63 @@
 
 <div x-data="app()" x-init="init()" x-cloak class="flex flex-col min-h-screen">
 
+  <!-- ===== SCHERMATA DI LOGIN ===== -->
+  <div x-show="!utente && !caricamentoIniziale" class="min-h-screen flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-6 w-full max-w-md">
+      <h1 class="text-xl font-bold text-primary-700 dark:text-primary-400 mb-1">Gestione Affitti</h1>
+      <p class="text-sm text-gray-500 dark:text-gray-400 mb-5" x-text="modalitaAuth === 'login' ? 'Accedi al tuo account' : 'Crea un nuovo account'"></p>
+
+      <form @submit.prevent="modalitaAuth === 'login' ? eseguiLogin() : eseguiSignup()" class="space-y-3">
+        <div>
+          <label class="text-xs font-medium">Email</label>
+          <input type="email" x-model="authEmail" required autocomplete="email"
+                 class="w-full text-sm border rounded px-3 py-2 dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-primary-500">
+        </div>
+        <div>
+          <label class="text-xs font-medium">Password</label>
+          <input type="password" x-model="authPassword" required minlength="6"
+                 :autocomplete="modalitaAuth === 'login' ? 'current-password' : 'new-password'"
+                 class="w-full text-sm border rounded px-3 py-2 dark:bg-gray-700 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-primary-500">
+          <p x-show="modalitaAuth === 'signup'" class="text-xs text-gray-400 mt-1">Minimo 6 caratteri</p>
+        </div>
+
+        <div x-show="authError" class="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded px-3 py-2 text-xs text-red-700 dark:text-red-300" x-text="authError"></div>
+        <div x-show="authInfo" class="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded px-3 py-2 text-xs text-green-700 dark:text-green-300" x-text="authInfo"></div>
+
+        <button type="submit" :disabled="authLoading"
+                class="w-full bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white rounded py-2 text-sm font-semibold transition-colors">
+          <span x-show="!authLoading" x-text="modalitaAuth === 'login' ? 'Accedi' : 'Registrati'"></span>
+          <span x-show="authLoading">Attendere...</span>
+        </button>
+      </form>
+
+      <div class="mt-4 text-center text-xs">
+        <template x-if="modalitaAuth === 'login'">
+          <p>Non hai un account?
+            <button @click="modalitaAuth = 'signup'; authError = ''; authInfo = ''" class="text-primary-600 dark:text-primary-400 hover:underline font-medium">Registrati</button>
+          </p>
+        </template>
+        <template x-if="modalitaAuth === 'signup'">
+          <p>Hai gia un account?
+            <button @click="modalitaAuth = 'login'; authError = ''; authInfo = ''" class="text-primary-600 dark:text-primary-400 hover:underline font-medium">Accedi</button>
+          </p>
+        </template>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SCHERMATA DI CARICAMENTO ===== -->
+  <div x-show="caricamentoIniziale" class="min-h-screen flex items-center justify-center">
+    <div class="text-center">
+      <div class="inline-block w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mb-3"></div>
+      <p class="text-sm text-gray-500">Caricamento in corso...</p>
+    </div>
+  </div>
+
+  <!-- ===== APP PRINCIPALE (visibile solo se loggato) ===== -->
+  <template x-if="utente && !caricamentoIniziale">
+  <div class="flex flex-col min-h-screen">
+
   <!-- ===== HEADER / NAVIGAZIONE ===== -->
   <header class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
     <div class="max-w-7xl mx-auto px-4 flex items-center justify-between h-12">
@@ -49,16 +116,11 @@
         <span x-show="statoSalvataggio === 'salvato'" class="text-green-600 dark:text-green-400">Salvato</span>
         <span x-show="statoSalvataggio === 'salvataggio'" class="text-yellow-600 dark:text-yellow-400">Salvataggio...</span>
         <span x-show="statoSalvataggio === 'errore'" class="text-red-600 dark:text-red-400">Errore salvataggio</span>
-        <template x-if="!supportaFSAccess">
-          <div class="flex gap-1">
-            <button @click="esportaJSON()" class="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-xs">Esporta JSON</button>
-            <button @click="$refs.importFile.click()" class="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-xs">Importa JSON</button>
-            <input type="file" x-ref="importFile" accept=".json" @change="importaJSON($event)" class="hidden">
-          </div>
-        </template>
-        <template x-if="supportaFSAccess && !fileHandle">
-          <button @click="apriFile()" class="px-2 py-1 bg-primary-500 text-white rounded text-xs">Apri dati.json</button>
-        </template>
+        <div class="flex gap-1 items-center">
+          <button @click="esportaJSON()" class="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-xs hidden sm:inline-block" title="Esporta backup">Esporta</button>
+          <span class="text-gray-500 dark:text-gray-400 hidden sm:inline" x-text="utente?.email"></span>
+          <button @click="eseguiLogout()" class="px-2 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-xs">Esci</button>
+        </div>
       </div>
     </div>
   </header>
@@ -556,6 +618,8 @@
 
   </main>
   <footer class="text-center text-xs text-gray-400 py-2">Gestione Affitti &amp; Utenze v1.0</footer>
+  </div>
+  </template>
 </div>
 
 <!-- ============================================================
@@ -630,9 +694,17 @@ function app() {
     vistaCorrente: 'dashboard',
     nomiMesi: ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'],
     dati: { proprieta: [], banche: [], incassiAffitti: [], utenze: [] },
-    fileHandle: null,
-    supportaFSAccess: !!window.showOpenFilePicker,
     statoSalvataggio: 'salvato',
+    // --- Stato autenticazione ---
+    utente: null,
+    caricamentoIniziale: true,
+    modalitaAuth: 'login',
+    authEmail: '',
+    authPassword: '',
+    authError: '',
+    authInfo: '',
+    authLoading: false,
+    debounceTimer: null,
     proprietaSelezionata: null,
     annoProprieta: new Date().getFullYear(),
     meseCalendario: new Date().getMonth(),
@@ -646,39 +718,134 @@ function app() {
     mostraFormBanca: false, editBanca: {},
 
     async init() {
-      const saved = localStorage.getItem('gestione_affitti_dati');
-      if (saved) { try { this.dati = JSON.parse(saved); } catch(e) {} }
-      if (!this.dati.proprieta || this.dati.proprieta.length === 0) { this.dati = datiEsempio(); }
-      this.generaIncassiAttesi();
-      this.resetFormUtenza();
-      await this.salva();
+      // Verifica se esiste una sessione attiva
+      const { data: { session } } = await sb.auth.getSession();
+      if (session) {
+        this.utente = session.user;
+        await this.caricaDatiUtente();
+      }
+      this.caricamentoIniziale = false;
+
+      // Ascolta cambiamenti di auth (login in altra tab, logout, refresh token)
+      sb.auth.onAuthStateChange(async (event, session) => {
+        if (event === 'SIGNED_IN' && session) {
+          this.utente = session.user;
+          await this.caricaDatiUtente();
+        } else if (event === 'SIGNED_OUT') {
+          this.utente = null;
+          this.dati = { proprieta: [], banche: [], incassiAffitti: [], utenze: [] };
+        }
+      });
     },
 
-    // --- Persistenza ---
-    async apriFile() {
+    // --- Autenticazione ---
+    async eseguiLogin() {
+      this.authLoading = true; this.authError = ''; this.authInfo = '';
       try {
-        const [handle] = await window.showOpenFilePicker({
-          types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }], multiple: false
+        const { data, error } = await sb.auth.signInWithPassword({
+          email: this.authEmail.trim(),
+          password: this.authPassword
         });
-        this.fileHandle = handle;
-        const file = await handle.getFile();
-        const testo = await file.text();
-        if (testo.trim()) { this.dati = JSON.parse(testo); this.generaIncassiAttesi(); }
-        this.statoSalvataggio = 'salvato';
-      } catch(e) { if (e.name !== 'AbortError') console.error('Errore apertura file:', e); }
+        if (error) throw error;
+        this.utente = data.user;
+        this.authPassword = '';
+        await this.caricaDatiUtente();
+      } catch(e) {
+        this.authError = this.traduciErroreAuth(e.message);
+      } finally {
+        this.authLoading = false;
+      }
     },
 
-    async salva() {
+    async eseguiSignup() {
+      this.authLoading = true; this.authError = ''; this.authInfo = '';
+      try {
+        const { data, error } = await sb.auth.signUp({
+          email: this.authEmail.trim(),
+          password: this.authPassword
+        });
+        if (error) throw error;
+        // Se Supabase richiede conferma email, session e null
+        if (!data.session) {
+          this.authInfo = 'Ti abbiamo inviato una email di conferma. Clicca il link per attivare l\'account, poi torna qui per accedere.';
+          this.modalitaAuth = 'login';
+        } else {
+          // Altrimenti login automatico
+          this.utente = data.user;
+          this.authPassword = '';
+          await this.caricaDatiUtente();
+        }
+      } catch(e) {
+        this.authError = this.traduciErroreAuth(e.message);
+      } finally {
+        this.authLoading = false;
+      }
+    },
+
+    async eseguiLogout() {
+      await sb.auth.signOut();
+      this.utente = null;
+      this.dati = { proprieta: [], banche: [], incassiAffitti: [], utenze: [] };
+      this.authEmail = ''; this.authPassword = '';
+    },
+
+    traduciErroreAuth(msg) {
+      if (/invalid login credentials/i.test(msg)) return 'Email o password errati.';
+      if (/email not confirmed/i.test(msg)) return 'Email non ancora confermata. Controlla la tua casella.';
+      if (/user already registered/i.test(msg)) return 'Esiste gia un account con questa email. Prova ad accedere.';
+      if (/password should be at least/i.test(msg)) return 'La password deve essere di almeno 6 caratteri.';
+      if (/invalid.*email/i.test(msg)) return 'Email non valida.';
+      return msg;
+    },
+
+    // --- Persistenza su Supabase ---
+    async caricaDatiUtente() {
       this.statoSalvataggio = 'salvataggio';
       try {
-        const json = JSON.stringify(this.dati, null, 2);
-        localStorage.setItem('gestione_affitti_dati', json);
-        if (this.fileHandle) {
-          const writable = await this.fileHandle.createWritable();
-          await writable.write(json); await writable.close();
+        const { data, error } = await sb.from('user_data')
+          .select('data').eq('user_id', this.utente.id).maybeSingle();
+        if (error) throw error;
+
+        if (data && data.data && data.data.proprieta) {
+          // Dati esistenti trovati nel DB
+          this.dati = data.data;
+        } else {
+          // Primo accesso: inizializza con dati di esempio e salva
+          this.dati = datiEsempio();
+          await this.salvaSubito();
         }
+        this.generaIncassiAttesi();
+        this.resetFormUtenza();
         this.statoSalvataggio = 'salvato';
-      } catch(e) { console.error('Errore salvataggio:', e); this.statoSalvataggio = 'errore'; }
+      } catch(e) {
+        console.error('Errore caricamento dati:', e);
+        this.statoSalvataggio = 'errore';
+      }
+    },
+
+    /** Salvataggio con debounce (300ms) per evitare richieste eccessive */
+    salva() {
+      if (!this.utente) return;
+      this.statoSalvataggio = 'salvataggio';
+      clearTimeout(this.debounceTimer);
+      this.debounceTimer = setTimeout(() => this.salvaSubito(), 300);
+    },
+
+    /** Salvataggio immediato su Supabase (upsert) */
+    async salvaSubito() {
+      if (!this.utente) return;
+      try {
+        const { error } = await sb.from('user_data').upsert({
+          user_id: this.utente.id,
+          data: this.dati,
+          updated_at: new Date().toISOString()
+        });
+        if (error) throw error;
+        this.statoSalvataggio = 'salvato';
+      } catch(e) {
+        console.error('Errore salvataggio:', e);
+        this.statoSalvataggio = 'errore';
+      }
     },
 
     esportaJSON() {
