@@ -102,9 +102,25 @@
 
   <!-- ===== HEADER / NAVIGAZIONE ===== -->
   <header class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
-    <div class="max-w-7xl mx-auto px-4 flex items-center justify-between h-12">
-      <h1 class="text-base font-bold text-primary-700 dark:text-primary-400 whitespace-nowrap">Gestione Affitti</h1>
-      <nav class="flex gap-1 overflow-x-auto text-sm">
+    <!-- Barra principale -->
+    <div class="max-w-7xl mx-auto px-3 sm:px-4 flex items-center justify-between h-12 gap-2">
+      <!-- Logo + hamburger mobile -->
+      <div class="flex items-center gap-2 min-w-0">
+        <!-- Hamburger (solo mobile) -->
+        <button @click="mobileMenuOpen = !mobileMenuOpen" class="lg:hidden p-1.5 -ml-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700" aria-label="Menu">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path x-show="!mobileMenuOpen" stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+            <path x-show="mobileMenuOpen" stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+        <h1 class="text-base font-bold text-primary-700 dark:text-primary-400 whitespace-nowrap">
+          <span class="lg:hidden">Affitti</span>
+          <span class="hidden lg:inline">Gestione Affitti</span>
+        </h1>
+      </div>
+
+      <!-- Nav desktop/tablet (solo md+) -->
+      <nav class="hidden lg:flex gap-1 text-sm">
         <template x-for="v in viste" :key="v.id">
           <button @click="vistaCorrente = v.id"
                   :class="vistaCorrente === v.id ? 'bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300 font-semibold' : 'hover:bg-gray-100 dark:hover:bg-gray-700'"
@@ -112,16 +128,34 @@
                   x-text="v.label"></button>
         </template>
       </nav>
-      <div class="flex items-center gap-2 text-xs">
-        <span x-show="statoSalvataggio === 'salvato'" class="text-green-600 dark:text-green-400">Salvato</span>
-        <span x-show="statoSalvataggio === 'salvataggio'" class="text-yellow-600 dark:text-yellow-400">Salvataggio...</span>
-        <span x-show="statoSalvataggio === 'errore'" class="text-red-600 dark:text-red-400">Errore salvataggio</span>
-        <div class="flex gap-1 items-center">
-          <button @click="esportaJSON()" class="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-xs hidden sm:inline-block" title="Esporta backup">Esporta</button>
-          <span class="text-gray-500 dark:text-gray-400 hidden sm:inline" x-text="utente?.email"></span>
-          <button @click="eseguiLogout()" class="px-2 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-xs">Esci</button>
-        </div>
+
+      <!-- Info utente + logout -->
+      <div class="flex items-center gap-1.5 sm:gap-2 text-xs shrink-0">
+        <span x-show="statoSalvataggio === 'salvato'" class="text-green-600 dark:text-green-400 hidden sm:inline">Salvato</span>
+        <span x-show="statoSalvataggio === 'salvato'" class="text-green-600 dark:text-green-400 sm:hidden" title="Salvato">&#10003;</span>
+        <span x-show="statoSalvataggio === 'salvataggio'" class="text-yellow-600 dark:text-yellow-400">...</span>
+        <span x-show="statoSalvataggio === 'errore'" class="text-red-600 dark:text-red-400" title="Errore">&#9888;</span>
+        <span class="text-gray-500 dark:text-gray-400 hidden md:inline truncate max-w-[150px]" x-text="utente?.email"></span>
+        <button @click="eseguiLogout()" class="px-2 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-xs">Esci</button>
       </div>
+    </div>
+
+    <!-- Menu mobile dropdown -->
+    <div x-show="mobileMenuOpen" x-transition
+         @click.away="mobileMenuOpen = false"
+         class="lg:hidden border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-2 py-2">
+      <nav class="flex flex-col gap-0.5">
+        <template x-for="v in viste" :key="v.id">
+          <button @click="vistaCorrente = v.id; mobileMenuOpen = false"
+                  :class="vistaCorrente === v.id ? 'bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300 font-semibold' : 'hover:bg-gray-100 dark:hover:bg-gray-700'"
+                  class="px-3 py-2.5 rounded-md text-left text-sm transition-colors"
+                  x-text="v.label"></button>
+        </template>
+        <div class="border-t border-gray-200 dark:border-gray-700 mt-1 pt-2 px-3 text-xs text-gray-500 dark:text-gray-400 truncate">
+          <span x-text="utente?.email"></span>
+        </div>
+        <button @click="esportaJSON(); mobileMenuOpen = false" class="px-3 py-2 text-left text-sm text-primary-600 dark:text-primary-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md">&darr; Esporta backup JSON</button>
+      </nav>
     </div>
   </header>
 
@@ -130,11 +164,17 @@
 
     <!-- ========== 1. DASHBOARD ========== -->
     <div x-show="vistaCorrente === 'dashboard'" class="page-enter">
-      <div class="flex items-center justify-between mb-4">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
         <h2 class="text-lg font-bold" x-text="'Dashboard — ' + nomeMeseCorrente()"></h2>
-        <div class="flex gap-4 text-sm">
-          <span class="font-semibold">Totale incassato: <span class="text-green-600 dark:text-green-400" x-text="formatValuta(totaleIncassatoMese())"></span></span>
-          <span class="font-semibold">Da incassare: <span class="text-yellow-600 dark:text-yellow-400" x-text="formatValuta(totaleDaIncassareMese())"></span></span>
+        <div class="grid grid-cols-2 sm:flex sm:gap-4 gap-2 text-xs sm:text-sm">
+          <div class="bg-white dark:bg-gray-800 sm:bg-transparent p-2 sm:p-0 rounded sm:rounded-none border sm:border-0 border-gray-200 dark:border-gray-700">
+            <div class="text-gray-500 sm:hidden">Incassato</div>
+            <div class="font-semibold"><span class="hidden sm:inline">Totale incassato:</span> <span class="text-green-600 dark:text-green-400" x-text="formatValuta(totaleIncassatoMese())"></span></div>
+          </div>
+          <div class="bg-white dark:bg-gray-800 sm:bg-transparent p-2 sm:p-0 rounded sm:rounded-none border sm:border-0 border-gray-200 dark:border-gray-700">
+            <div class="text-gray-500 sm:hidden">Da incassare</div>
+            <div class="font-semibold"><span class="hidden sm:inline">Da incassare:</span> <span class="text-yellow-600 dark:text-yellow-400" x-text="formatValuta(totaleDaIncassareMese())"></span></div>
+          </div>
         </div>
       </div>
       <!-- Card proprieta -->
@@ -196,14 +236,14 @@
 
     <!-- ========== 2. CALENDARIO ========== -->
     <div x-show="vistaCorrente === 'calendario'" class="page-enter">
-      <div class="flex items-center justify-between mb-4">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
         <div class="flex items-center gap-2">
-          <button @click="meseCalendario--; if(meseCalendario<0){meseCalendario=11;annoCalendario--}" class="px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 text-sm">&larr;</button>
-          <h2 class="text-lg font-bold" x-text="nomiMesi[meseCalendario] + ' ' + annoCalendario"></h2>
-          <button @click="meseCalendario++; if(meseCalendario>11){meseCalendario=0;annoCalendario++}" class="px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 text-sm">&rarr;</button>
+          <button @click="meseCalendario--; if(meseCalendario<0){meseCalendario=11;annoCalendario--}" class="px-3 py-1.5 rounded bg-gray-200 dark:bg-gray-700 text-sm">&larr;</button>
+          <h2 class="text-lg font-bold flex-1 text-center sm:text-left" x-text="nomiMesi[meseCalendario] + ' ' + annoCalendario"></h2>
+          <button @click="meseCalendario++; if(meseCalendario>11){meseCalendario=0;annoCalendario++}" class="px-3 py-1.5 rounded bg-gray-200 dark:bg-gray-700 text-sm">&rarr;</button>
         </div>
         <div class="flex gap-2">
-          <button @click="generaIncassiMeseVisualizzato()" class="px-3 py-1 bg-primary-500 hover:bg-primary-600 text-white rounded text-xs">+ Genera incassi mancanti</button>
+          <button @click="generaIncassiMeseVisualizzato()" class="w-full sm:w-auto px-3 py-1.5 bg-primary-500 hover:bg-primary-600 text-white rounded text-xs">+ Genera incassi mancanti</button>
         </div>
       </div>
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -212,19 +252,19 @@
             <h3 class="font-bold text-sm mb-2 text-primary-600 dark:text-primary-400" x-text="gruppo.label"></h3>
             <div class="space-y-2">
               <template x-for="inc in gruppo.incassi" :key="inc.id">
-                <div class="flex items-center justify-between p-2 rounded-md"
+                <div class="flex items-center justify-between p-2 rounded-md gap-2"
                      :class="inc.dataIncasso ? 'bg-green-50 dark:bg-green-900/30' : (isRitardo(inc) ? 'bg-red-50 dark:bg-red-900/30' : 'bg-gray-50 dark:bg-gray-700/50')">
                   <div class="flex-1 min-w-0">
                     <div class="text-sm font-medium truncate" x-text="nomeProprieta(inc.proprietaId)"></div>
                     <div class="text-xs text-gray-500" x-text="formatValuta(inc.importo) + (inc.dataIncasso ? ' — ' + formatData(inc.dataIncasso) : '')"></div>
                   </div>
-                  <div class="flex items-center gap-1 ml-2">
+                  <div class="flex items-center gap-1 shrink-0">
                     <span x-show="inc.dataIncasso" class="text-green-600 text-sm">&#10003;</span>
                     <span x-show="!inc.dataIncasso && isRitardo(inc)" class="text-red-500 text-sm">&#9888;</span>
                     <button x-show="!inc.dataIncasso" @click="segnaIncassatoOggi(inc)"
-                            class="px-2 py-1 text-xs bg-green-500 hover:bg-green-600 text-white rounded">Incassa oggi</button>
-                    <button @click="apriFormIncasso(inc)" class="px-2 py-1 text-xs bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 rounded" title="Modifica">&#9998;</button>
-                    <button @click="eliminaIncasso(inc.id)" class="px-2 py-1 text-xs text-red-500 hover:text-red-700" title="Elimina">&#10005;</button>
+                            class="px-2 py-1 text-xs bg-green-500 hover:bg-green-600 text-white rounded whitespace-nowrap"><span class="hidden sm:inline">Incassa oggi</span><span class="sm:hidden">Incassa</span></button>
+                    <button @click="apriFormIncasso(inc)" class="p-1.5 text-xs bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 rounded" title="Modifica">&#9998;</button>
+                    <button @click="eliminaIncasso(inc.id)" class="p-1.5 text-xs text-red-500 hover:text-red-700" title="Elimina">&#10005;</button>
                   </div>
                 </div>
               </template>
@@ -304,7 +344,7 @@
           <button @click="proprietaSelezionata = null" class="text-sm text-primary-600 dark:text-primary-400 mb-3 hover:underline">&larr; Tutte le proprieta</button>
           <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 mb-4">
             <h2 class="text-lg font-bold" x-text="getProprieta(proprietaSelezionata).nome"></h2>
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2 text-xs">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mt-2 text-xs">
               <div>Tipo: <span class="font-medium" x-text="getProprieta(proprietaSelezionata).tipo"></span></div>
               <div>Affitto: <span class="font-medium" x-text="formatValuta(getProprieta(proprietaSelezionata).importoAffittoMensile)"></span></div>
               <div>Scadenza: <span class="font-medium" x-text="labelScadenza(getProprieta(proprietaSelezionata).scadenzaAffitto)"></span></div>
@@ -443,7 +483,7 @@
       <!-- Form nuova utenza -->
       <div x-show="mostraFormUtenza" class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 mb-4">
         <h3 class="font-bold text-sm mb-3">Nuova Utenza</h3>
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div><label class="text-xs">Proprieta</label>
             <select x-model="nuovaUtenza.proprietaId" class="w-full text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600">
               <template x-for="p in dati.proprieta" :key="p.id"><option :value="p.id" x-text="p.nome"></option></template>
@@ -520,7 +560,7 @@
           <button @click="mostraFormProprieta = true; editProprieta = creaProprieta()" class="px-3 py-1 bg-primary-500 text-white rounded text-sm">+ Nuova</button>
         </div>
         <div x-show="mostraFormProprieta" class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 mb-4">
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <div><label class="text-xs">Nome</label>
               <input type="text" x-model="editProprieta.nome" class="w-full text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600"></div>
             <div><label class="text-xs">Tipo</label>
@@ -692,6 +732,7 @@ function app() {
       { id: 'impostazioni', label: 'Impostazioni' }
     ],
     vistaCorrente: 'dashboard',
+    mobileMenuOpen: false,
     nomiMesi: ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'],
     dati: { proprieta: [], banche: [], incassiAffitti: [], utenze: [] },
     statoSalvataggio: 'salvato',
