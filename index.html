@@ -653,7 +653,16 @@ function app() {
       }
       for (const mese of mesi) {
         for (const prop of this.dati.proprieta) {
-          if (this.dati.incassiAffitti.some(i => i.proprietaId === prop.id && i.mese === mese)) continue;
+          const esistente = this.dati.incassiAffitti.find(i => i.proprietaId === prop.id && i.mese === mese);
+          if (esistente) {
+            // Aggiorna incassi non ancora incassati con i nuovi dati della proprieta
+            if (!esistente.dataIncasso) {
+              esistente.importo = prop.importoAffittoMensile;
+              esistente.bancaId = prop.bancaIncasso;
+              esistente.dataPrevista = dataPrevist(mese, prop.scadenzaAffitto);
+            }
+            continue;
+          }
           if (prop.importoAffittoMensile > 0) {
             this.dati.incassiAffitti.push({
               id: uid(), proprietaId: prop.id, mese,
