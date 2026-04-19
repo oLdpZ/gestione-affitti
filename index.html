@@ -135,6 +135,7 @@
         <span x-show="statoSalvataggio === 'salvato'" class="text-green-600 dark:text-green-400 sm:hidden" title="Salvato">&#10003;</span>
         <span x-show="statoSalvataggio === 'salvataggio'" class="text-yellow-600 dark:text-yellow-400">...</span>
         <span x-show="statoSalvataggio === 'errore'" class="text-red-600 dark:text-red-400" title="Errore">&#9888;</span>
+        <span x-show="statoSalvataggio === 'offline'" class="text-yellow-600 dark:text-yellow-400" title="Salvato solo in locale">&#9737;</span>
         <span class="text-gray-500 dark:text-gray-400 hidden md:inline truncate max-w-[150px]" x-text="utente?.email"></span>
         <button @click="eseguiLogout()" class="px-2 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-xs">Esci</button>
       </div>
@@ -159,6 +160,11 @@
     </div>
   </header>
 
+  <!-- ===== BANNER MODALITÀ OFFLINE ===== -->
+  <div x-show="modalitaOffline" class="bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-200 text-sm px-4 py-2 text-center">
+    Modalità offline &mdash; stai vedendo dati dalla cache locale. Le modifiche saranno sincronizzate al ripristino della connessione.
+  </div>
+
   <!-- ===== CONTENUTO PRINCIPALE ===== -->
   <main class="flex-1 max-w-7xl mx-auto w-full px-4 py-4">
 
@@ -169,11 +175,21 @@
         <div class="grid grid-cols-2 sm:flex sm:gap-4 gap-2 text-xs sm:text-sm">
           <div class="bg-white dark:bg-gray-800 sm:bg-transparent p-2 sm:p-0 rounded sm:rounded-none border sm:border-0 border-gray-200 dark:border-gray-700">
             <div class="text-gray-500 sm:hidden">Incassato</div>
-            <div class="font-semibold"><span class="hidden sm:inline">Totale incassato:</span> <span class="text-green-600 dark:text-green-400" x-text="formatValuta(totaleIncassatoMese())"></span></div>
+            <div class="font-semibold flex flex-wrap gap-x-2 items-baseline"><span class="hidden sm:inline">Totale incassato:</span>
+              <template x-for="cur in ['EUR','USD']" :key="cur">
+                <span x-show="totaleIncassatoMese()[cur] > 0" x-text="formatValuta(totaleIncassatoMese()[cur], cur)" class="text-green-600 dark:text-green-400"></span>
+              </template>
+              <span x-show="totaleIncassatoMese().EUR === 0 && totaleIncassatoMese().USD === 0" class="text-green-600 dark:text-green-400" x-text="formatValuta(0, 'EUR')"></span>
+            </div>
           </div>
           <div class="bg-white dark:bg-gray-800 sm:bg-transparent p-2 sm:p-0 rounded sm:rounded-none border sm:border-0 border-gray-200 dark:border-gray-700">
             <div class="text-gray-500 sm:hidden">Da incassare</div>
-            <div class="font-semibold"><span class="hidden sm:inline">Da incassare:</span> <span class="text-yellow-600 dark:text-yellow-400" x-text="formatValuta(totaleDaIncassareMese())"></span></div>
+            <div class="font-semibold flex flex-wrap gap-x-2 items-baseline"><span class="hidden sm:inline">Da incassare:</span>
+              <template x-for="cur in ['EUR','USD']" :key="cur">
+                <span x-show="totaleDaIncassareMese()[cur] > 0" x-text="formatValuta(totaleDaIncassareMese()[cur], cur)" class="text-yellow-600 dark:text-yellow-400"></span>
+              </template>
+              <span x-show="totaleDaIncassareMese().EUR === 0 && totaleDaIncassareMese().USD === 0" class="text-yellow-600 dark:text-yellow-400" x-text="formatValuta(0, 'EUR')"></span>
+            </div>
           </div>
         </div>
       </div>
@@ -187,7 +203,7 @@
               <span x-html="statoAffittoMese(p.id)" class="text-sm"></span>
             </div>
             <div class="text-xs text-gray-500 dark:text-gray-400 space-y-0.5">
-              <div>Affitto: <span class="font-medium text-gray-700 dark:text-gray-300" x-text="formatValuta(p.importoAffittoMensile)"></span></div>
+              <div>Affitto: <span class="font-medium text-gray-700 dark:text-gray-300" x-text="formatValuta(p.importoAffittoMensile, p.currency)"></span></div>
               <div>Scadenza: <span x-text="labelScadenza(p.scadenzaAffitto)"></span></div>
               <div>Banca: <span x-text="nomeBanca(p.bancaIncasso) || '—'"></span></div>
             </div>
@@ -202,7 +218,12 @@
             <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3">
               <div class="flex justify-between items-center">
                 <span class="font-semibold text-sm" x-text="b.nome + ' (' + b.intestatario + ')'"></span>
-                <span class="text-sm font-bold text-orange-600 dark:text-orange-400" x-text="formatValuta(totaleDaGirareVersoBanca(b.id))"></span>
+                <span class="text-sm font-bold text-orange-600 dark:text-orange-400 flex gap-2">
+                  <template x-for="cur in ['EUR','USD']" :key="cur">
+                    <span x-show="totaleDaGirareVersoBanca(b.id)[cur] > 0" x-text="formatValuta(totaleDaGirareVersoBanca(b.id)[cur], cur)"></span>
+                  </template>
+                  <span x-show="totaleDaGirareVersoBanca(b.id).EUR === 0 && totaleDaGirareVersoBanca(b.id).USD === 0" x-text="formatValuta(0, b.currency)"></span>
+                </span>
               </div>
             </div>
           </template>
@@ -224,7 +245,7 @@
               <template x-for="u in utenzeInScadenza()" :key="u.id">
                 <tr class="border-t border-gray-100 dark:border-gray-700">
                   <td x-text="nomeProprieta(u.proprietaId)"></td><td x-text="u.tipo"></td>
-                  <td x-text="u.fornitore || '—'"></td><td class="text-right" x-text="formatValuta(u.importo)"></td>
+                  <td x-text="u.fornitore || '—'"></td><td class="text-right" x-text="formatValuta(u.importo, u.currency)"></td>
                   <td x-text="formatData(u.dataScadenza)"></td><td x-html="badgeStatoUtenza(u.stato)"></td>
                 </tr>
               </template>
@@ -256,7 +277,7 @@
                      :class="inc.dataIncasso ? 'bg-green-50 dark:bg-green-900/30' : (isRitardo(inc) ? 'bg-red-50 dark:bg-red-900/30' : 'bg-gray-50 dark:bg-gray-700/50')">
                   <div class="flex-1 min-w-0">
                     <div class="text-sm font-medium truncate" x-text="nomeProprieta(inc.proprietaId)"></div>
-                    <div class="text-xs text-gray-500" x-text="formatValuta(inc.importo) + (inc.dataIncasso ? ' — ' + formatData(inc.dataIncasso) : '')"></div>
+                    <div class="text-xs text-gray-500" x-text="formatValuta(inc.importo, inc.currency) + (inc.dataIncasso ? ' — ' + formatData(inc.dataIncasso) : '')"></div>
                   </div>
                   <div class="flex items-center gap-1 shrink-0">
                     <span x-show="inc.dataIncasso" class="text-green-600 text-sm">&#10003;</span>
@@ -283,7 +304,7 @@
           <template x-if="incassoInModifica">
             <div class="space-y-3">
               <div>
-                <label class="text-xs text-gray-500">Proprieta</label>
+                <label class="text-xs text-gray-500">Proprietà</label>
                 <div class="font-medium" x-text="nomeProprieta(incassoInModifica.proprietaId)"></div>
               </div>
               <div>
@@ -299,8 +320,13 @@
                 <input type="date" x-model="incassoInModifica.dataIncasso" class="w-full text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600">
               </div>
               <div>
-                <label class="text-xs">Importo (€)</label>
-                <input type="number" step="0.01" x-model.number="incassoInModifica.importo" class="w-full text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600">
+                <label class="text-xs flex items-center gap-1">Importo
+                  <span class="text-gray-500">(<span x-text="incassoInModifica.currency || 'EUR'"></span>)</span>
+                </label>
+                <div class="flex items-center gap-1">
+                  <span class="text-sm text-gray-500 w-4 text-center" x-text="(incassoInModifica.currency || 'EUR') === 'USD' ? '$' : '€'"></span>
+                  <input type="number" step="0.01" x-model.number="incassoInModifica.importo" class="flex-1 text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600">
+                </div>
               </div>
               <div>
                 <label class="text-xs">Banca incasso</label>
@@ -333,7 +359,7 @@
               <div @click="apriProprieta(p.id)"
                    class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 cursor-pointer hover:shadow-md transition-shadow">
                 <h3 class="font-semibold" x-text="p.nome"></h3>
-                <div class="text-xs text-gray-500 mt-1" x-text="formatValuta(p.importoAffittoMensile) + '/mese — ' + p.intestatario"></div>
+                <div class="text-xs text-gray-500 mt-1" x-text="formatValuta(p.importoAffittoMensile, p.currency) + '/mese — ' + p.intestatario"></div>
               </div>
             </template>
           </div>
@@ -346,18 +372,23 @@
             <h2 class="text-lg font-bold" x-text="getProprieta(proprietaSelezionata).nome"></h2>
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mt-2 text-xs">
               <div>Tipo: <span class="font-medium" x-text="getProprieta(proprietaSelezionata).tipo"></span></div>
-              <div>Affitto: <span class="font-medium" x-text="formatValuta(getProprieta(proprietaSelezionata).importoAffittoMensile)"></span></div>
+              <div>Affitto: <span class="font-medium" x-text="formatValuta(getProprieta(proprietaSelezionata).importoAffittoMensile, getProprieta(proprietaSelezionata).currency)"></span></div>
               <div>Scadenza: <span class="font-medium" x-text="labelScadenza(getProprieta(proprietaSelezionata).scadenzaAffitto)"></span></div>
               <div>Intestatario: <span class="font-medium" x-text="getProprieta(proprietaSelezionata).intestatario"></span></div>
             </div>
           </div>
           <!-- Filtro anno -->
-          <div class="flex items-center gap-2 mb-3">
+          <div class="flex flex-wrap items-center gap-2 mb-3">
             <label class="text-sm font-semibold">Anno:</label>
             <select x-model.number="annoProprieta" class="text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600">
               <template x-for="a in anniDisponibili()" :key="a"><option :value="a" x-text="a"></option></template>
             </select>
-            <span class="text-sm ml-4">Totale incassi anno: <strong class="text-green-600 dark:text-green-400" x-text="formatValuta(totaleIncassiAnno(proprietaSelezionata, annoProprieta))"></strong></span>
+            <span class="text-sm sm:ml-4 inline-flex flex-wrap gap-2 items-baseline">Totale incassi anno:
+              <template x-for="cur in ['EUR','USD']" :key="cur">
+                <strong x-show="totaleIncassiAnno(proprietaSelezionata, annoProprieta)[cur] > 0" class="text-green-600 dark:text-green-400" x-text="formatValuta(totaleIncassiAnno(proprietaSelezionata, annoProprieta)[cur], cur)"></strong>
+              </template>
+              <strong x-show="totaleIncassiAnno(proprietaSelezionata, annoProprieta).EUR === 0 && totaleIncassiAnno(proprietaSelezionata, annoProprieta).USD === 0" class="text-green-600 dark:text-green-400" x-text="formatValuta(0, getProprieta(proprietaSelezionata).currency)"></strong>
+            </span>
           </div>
           <!-- Storico incassi -->
           <h3 class="text-sm font-bold mb-2">Storico Incassi</h3>
@@ -372,7 +403,7 @@
                   <tr class="border-t border-gray-100 dark:border-gray-700">
                     <td x-text="inc.mese"></td><td x-text="formatData(inc.dataPrevista)"></td>
                     <td x-text="inc.dataIncasso ? formatData(inc.dataIncasso) : '—'"></td>
-                    <td class="text-right" x-text="formatValuta(inc.importo)"></td>
+                    <td class="text-right" x-text="formatValuta(inc.importo, inc.currency)"></td>
                     <td x-text="nomeBanca(inc.bancaId) || '—'"></td>
                     <td x-text="inc.girato ? formatData(inc.dataGiro) : '—'"></td>
                     <td x-text="inc.note || ''"></td>
@@ -394,13 +425,18 @@
                   <tr class="border-t border-gray-100 dark:border-gray-700">
                     <td x-text="u.tipo"></td><td x-text="u.fornitore || '—'"></td>
                     <td x-text="u.periodoRiferimento"></td><td x-text="formatData(u.dataScadenza)"></td>
-                    <td class="text-right" x-text="formatValuta(u.importo)"></td><td x-html="badgeStatoUtenza(u.stato)"></td>
+                    <td class="text-right" x-text="formatValuta(u.importo, u.currency)"></td><td x-html="badgeStatoUtenza(u.stato)"></td>
                   </tr>
                 </template>
               </tbody>
             </table>
           </div>
-          <div class="mt-2 text-sm">Totale utenze anno: <strong x-text="formatValuta(totaleUtenzeAnno(proprietaSelezionata, annoProprieta))"></strong></div>
+          <div class="mt-2 text-sm flex flex-wrap gap-2 items-baseline">Totale utenze anno:
+            <template x-for="cur in ['EUR','USD']" :key="cur">
+              <strong x-show="totaleUtenzeAnno(proprietaSelezionata, annoProprieta)[cur] > 0" x-text="formatValuta(totaleUtenzeAnno(proprietaSelezionata, annoProprieta)[cur], cur)"></strong>
+            </template>
+            <strong x-show="totaleUtenzeAnno(proprietaSelezionata, annoProprieta).EUR === 0 && totaleUtenzeAnno(proprietaSelezionata, annoProprieta).USD === 0" x-text="formatValuta(0, getProprieta(proprietaSelezionata).currency)"></strong>
+          </div>
         </div>
       </template>
     </div>
@@ -415,11 +451,21 @@
       <div class="space-y-6">
         <template x-for="b in dati.banche" :key="b.id">
           <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-            <div class="flex justify-between items-center mb-3">
+            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-3">
               <h3 class="font-bold" x-text="b.nome + ' — ' + b.intestatario"></h3>
-              <div class="text-sm">
-                <span>Incassato: <strong class="text-green-600 dark:text-green-400" x-text="formatValuta(totaleIncassatoBancaMese(b.id))"></strong></span>
-                <span class="ml-4">Da girare: <strong class="text-orange-600 dark:text-orange-400" x-text="formatValuta(totaleDaGirareBancaMese(b.id))"></strong></span>
+              <div class="text-sm flex flex-wrap gap-x-4 gap-y-1 items-baseline">
+                <span class="inline-flex flex-wrap gap-2 items-baseline">Incassato:
+                  <template x-for="cur in ['EUR','USD']" :key="cur">
+                    <strong x-show="totaleIncassatoBancaMese(b.id)[cur] > 0" class="text-green-600 dark:text-green-400" x-text="formatValuta(totaleIncassatoBancaMese(b.id)[cur], cur)"></strong>
+                  </template>
+                  <strong x-show="totaleIncassatoBancaMese(b.id).EUR === 0 && totaleIncassatoBancaMese(b.id).USD === 0" class="text-green-600 dark:text-green-400" x-text="formatValuta(0, b.currency)"></strong>
+                </span>
+                <span class="inline-flex flex-wrap gap-2 items-baseline">Da girare:
+                  <template x-for="cur in ['EUR','USD']" :key="cur">
+                    <strong x-show="totaleDaGirareBancaMese(b.id)[cur] > 0" class="text-orange-600 dark:text-orange-400" x-text="formatValuta(totaleDaGirareBancaMese(b.id)[cur], cur)"></strong>
+                  </template>
+                  <strong x-show="totaleDaGirareBancaMese(b.id).EUR === 0 && totaleDaGirareBancaMese(b.id).USD === 0" class="text-orange-600 dark:text-orange-400" x-text="formatValuta(0, b.currency)"></strong>
+                </span>
               </div>
             </div>
             <div class="overflow-x-auto">
@@ -433,7 +479,7 @@
                     <tr class="border-t border-gray-100 dark:border-gray-700">
                       <td x-text="nomeProprieta(inc.proprietaId)"></td>
                       <td x-text="inc.dataIncasso ? formatData(inc.dataIncasso) : '—'"></td>
-                      <td class="text-right" x-text="formatValuta(inc.importo)"></td>
+                      <td class="text-right" x-text="formatValuta(inc.importo, inc.currency)"></td>
                       <td x-text="inc.girato ? formatData(inc.dataGiro) : '—'"></td>
                       <td x-text="inc.bancaDestinazioneId ? nomeBanca(inc.bancaDestinazioneId) : '—'"></td>
                       <td>
@@ -526,7 +572,7 @@
               <tr class="border-t border-gray-100 dark:border-gray-700">
                 <td x-text="nomeProprieta(u.proprietaId)"></td><td x-text="u.tipo"></td>
                 <td x-text="u.fornitore || '—'"></td><td x-text="u.periodoRiferimento"></td>
-                <td x-text="formatData(u.dataScadenza)"></td><td class="text-right" x-text="formatValuta(u.importo)"></td>
+                <td x-text="formatData(u.dataScadenza)"></td><td class="text-right" x-text="formatValuta(u.importo, u.currency)"></td>
                 <td x-html="badgeStatoUtenza(u.stato)"></td>
                 <td>
                   <select @change="cambiaStatoUtenza(u, $event.target.value); $event.target.value = ''"
@@ -542,7 +588,14 @@
           </tbody>
           <tfoot class="bg-gray-50 dark:bg-gray-750 font-semibold"><tr>
             <td colspan="5" class="text-right text-xs">Totale:</td>
-            <td class="text-right text-xs" x-text="formatValuta(totaleUtenzeFiltrate())"></td>
+            <td class="text-right text-xs">
+              <div class="flex flex-wrap gap-2 justify-end">
+                <template x-for="cur in ['EUR','USD']" :key="cur">
+                  <span x-show="totaleUtenzeFiltrate()[cur] > 0" x-text="formatValuta(totaleUtenzeFiltrate()[cur], cur)"></span>
+                </template>
+                <span x-show="totaleUtenzeFiltrate().EUR === 0 && totaleUtenzeFiltrate().USD === 0" x-text="formatValuta(0, 'EUR')"></span>
+              </div>
+            </td>
             <td colspan="2"></td>
           </tr></tfoot>
         </table>
@@ -573,6 +626,11 @@
               </select></div>
             <div><label class="text-xs">Importo mensile</label>
               <input type="number" step="0.01" x-model.number="editProprieta.importoAffittoMensile" class="w-full text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600"></div>
+            <div><label class="text-xs">Valuta</label>
+              <select x-model="editProprieta.currency" class="w-full text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600">
+                <option value="EUR">Euro (&euro;)</option>
+                <option value="USD">Dollaro USA ($)</option>
+              </select></div>
             <div><label class="text-xs">Banca incasso</label>
               <select x-model="editProprieta.bancaIncasso" class="w-full text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600">
                 <option value="">—</option>
@@ -597,14 +655,15 @@
           <table class="w-full table-dense bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
             <thead class="bg-gray-50 dark:bg-gray-750"><tr>
               <th class="text-left">Nome</th><th class="text-left">Tipo</th><th class="text-left">Scadenza</th>
-              <th class="text-right">Importo</th><th class="text-left">Banca</th><th class="text-left">Intestatario</th><th class="text-left">Azioni</th>
+              <th class="text-right">Importo</th><th class="text-left">Valuta</th><th class="text-left">Banca</th><th class="text-left">Intestatario</th><th class="text-left">Azioni</th>
             </tr></thead>
             <tbody>
               <template x-for="p in dati.proprieta" :key="p.id">
                 <tr class="border-t border-gray-100 dark:border-gray-700">
                   <td class="font-medium" x-text="p.nome"></td><td x-text="p.tipo"></td>
                   <td x-text="labelScadenza(p.scadenzaAffitto)"></td>
-                  <td class="text-right" x-text="formatValuta(p.importoAffittoMensile)"></td>
+                  <td class="text-right" x-text="formatValuta(p.importoAffittoMensile, p.currency)"></td>
+                  <td><span class="text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700" x-text="p.currency || 'EUR'"></span></td>
                   <td x-text="nomeBanca(p.bancaIncasso) || '—'"></td><td x-text="p.intestatario"></td>
                   <td>
                     <button @click="modificaProprieta(p)" class="text-xs text-primary-600 hover:underline">Modifica</button>
@@ -624,11 +683,16 @@
           <button @click="mostraFormBanca = true; editBanca = creaBanca()" class="px-3 py-1 bg-primary-500 text-white rounded text-sm">+ Nuova</button>
         </div>
         <div x-show="mostraFormBanca" class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 mb-4">
-          <div class="grid grid-cols-2 gap-3">
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div><label class="text-xs">Nome banca</label>
               <input type="text" x-model="editBanca.nome" class="w-full text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600"></div>
             <div><label class="text-xs">Intestatario</label>
               <input type="text" x-model="editBanca.intestatario" class="w-full text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600"></div>
+            <div><label class="text-xs">Valuta</label>
+              <select x-model="editBanca.currency" class="w-full text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600">
+                <option value="EUR">Euro (&euro;)</option>
+                <option value="USD">Dollaro USA ($)</option>
+              </select></div>
           </div>
           <div class="flex gap-2 mt-3">
             <button @click="salvaBanca()" class="px-3 py-1 bg-green-500 text-white rounded text-sm">Salva</button>
@@ -638,12 +702,16 @@
         <div class="overflow-x-auto">
           <table class="w-full table-dense bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
             <thead class="bg-gray-50 dark:bg-gray-750"><tr>
-              <th class="text-left">Nome</th><th class="text-left">Intestatario</th><th class="text-left">Azioni</th>
+              <th class="text-left">Nome</th><th class="text-left">Intestatario</th><th class="text-left">Valuta</th><th class="text-left">Azioni</th>
             </tr></thead>
             <tbody>
               <template x-for="b in dati.banche" :key="b.id">
                 <tr class="border-t border-gray-100 dark:border-gray-700">
-                  <td class="font-medium" x-text="b.nome"></td><td x-text="b.intestatario"></td>
+                  <td class="font-medium">
+                    <span x-text="b.nome"></span>
+                  </td>
+                  <td x-text="b.intestatario"></td>
+                  <td><span class="text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700" x-text="b.currency || 'EUR'"></span></td>
                   <td>
                     <button @click="modificaBanca(b)" class="text-xs text-primary-600 hover:underline">Modifica</button>
                     <button @click="eliminaBanca(b.id)" class="text-xs text-red-500 hover:underline ml-2">Elimina</button>
@@ -669,10 +737,11 @@
 /** Genera un ID univoco breve */
 function uid() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 6); }
 
-/** Formatta importo in euro con separatori italiani */
-function formatValuta(n) {
-  if (n == null || isNaN(n)) return '0,00 \u20AC';
-  return n.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' });
+/** Formatta importo nella valuta indicata (EUR default, USD supportato) */
+function formatValuta(n, currency = 'EUR') {
+  if (n == null || isNaN(n)) return currency === 'USD' ? '$0.00' : '0,00 \u20AC';
+  const locale = currency === 'USD' ? 'en-US' : 'it-IT';
+  return n.toLocaleString(locale, { style: 'currency', currency });
 }
 
 /** Formatta data ISO in gg/mm/aaaa */
@@ -704,8 +773,8 @@ function dataPrevist(mese, scadenza) {
 
 /** Dati di esempio iniziali */
 function datiEsempio() {
-  const bBPM = { id: uid(), nome: 'BPM', intestatario: 'Stefano Desio' };
-  const bBPER = { id: uid(), nome: 'BPER', intestatario: 'Gina Desio' };
+  const bBPM = { id: uid(), nome: 'BPM', intestatario: 'Stefano Desio', currency: 'EUR' };
+  const bBPER = { id: uid(), nome: 'BPER', intestatario: 'Gina Desio', currency: 'EUR' };
   const nomi = ['Via Guelfa','Via Dei Servi','Elba 508','Elba 626','Follonica Bicocchi','Franklin 214','Sweetzer 201','Ghibellina 101','Larrabee 116'];
   const importi = [800,900,750,650,1000,1200,1100,850,950];
   const proprieta = nomi.map((nome, i) => ({
@@ -715,9 +784,31 @@ function datiEsempio() {
     bancaIncasso: i % 2 === 0 ? bBPM.id : bBPER.id,
     intestatario: i % 2 === 0 ? 'Stefano Desio' : 'Gina Desio',
     bancaDestinazione: i % 2 === 0 ? bBPER.id : bBPM.id,
+    currency: 'EUR',
     note: ''
   }));
-  return { proprieta, banche: [bBPM, bBPER], incassiAffitti: [], utenze: [] };
+  return { dataVersion: 2, proprieta, banche: [bBPM, bBPER], incassiAffitti: [], utenze: [] };
+}
+
+/** Migrazione schema dati: idempotente, applica cambiamenti incrementali per versione. */
+function migraDati(dati) {
+  if (!dati || typeof dati !== 'object') return dati;
+  if (!dati.dataVersion || dati.dataVersion < 2) {
+    if (Array.isArray(dati.proprieta)) {
+      for (const p of dati.proprieta) { if (!p.currency) p.currency = 'EUR'; }
+    }
+    if (Array.isArray(dati.banche)) {
+      for (const b of dati.banche) { if (!b.currency) b.currency = 'EUR'; }
+    }
+    if (Array.isArray(dati.incassiAffitti)) {
+      for (const i of dati.incassiAffitti) { if (!i.currency) i.currency = 'EUR'; }
+    }
+    if (Array.isArray(dati.utenze)) {
+      for (const u of dati.utenze) { if (!u.currency) u.currency = 'EUR'; }
+    }
+    dati.dataVersion = 2;
+  }
+  return dati;
 }
 
 // ---------- Componente Alpine principale ----------
@@ -734,8 +825,9 @@ function app() {
     vistaCorrente: 'dashboard',
     mobileMenuOpen: false,
     nomiMesi: ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'],
-    dati: { proprieta: [], banche: [], incassiAffitti: [], utenze: [] },
+    dati: { dataVersion: 2, proprieta: [], banche: [], incassiAffitti: [], utenze: [] },
     statoSalvataggio: 'salvato',
+    modalitaOffline: false,
     // --- Stato autenticazione ---
     utente: null,
     caricamentoIniziale: true,
@@ -774,8 +866,19 @@ function app() {
           await this.caricaDatiUtente();
         } else if (event === 'SIGNED_OUT') {
           this.utente = null;
-          this.dati = { proprieta: [], banche: [], incassiAffitti: [], utenze: [] };
+          this.dati = { dataVersion: 2, proprieta: [], banche: [], incassiAffitti: [], utenze: [] };
         }
+      });
+
+      // Listener connettivita: quando torna online rilanciamo caricaDatiUtente
+      // che, grazie al confronto updated_at, ri-pushera la cache se piu recente.
+      window.addEventListener('online', () => {
+        if (this.utente && this.modalitaOffline) {
+          this.caricaDatiUtente();
+        }
+      });
+      window.addEventListener('offline', () => {
+        this.modalitaOffline = true;
       });
     },
 
@@ -844,15 +947,49 @@ function app() {
       this.statoSalvataggio = 'salvataggio';
       try {
         const { data, error } = await sb.from('user_data')
-          .select('data').eq('user_id', this.utente.id).maybeSingle();
+          .select('data, updated_at').eq('user_id', this.utente.id).maybeSingle();
         if (error) throw error;
 
+        // Conflict resolution: se la cache locale e piu recente del remoto, ri-pusha.
+        let cacheLocale = null;
+        try {
+          const raw = localStorage.getItem('gestione_affitti_cache');
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed && parsed.user_id === this.utente.id && parsed.data && parsed.updated_at) {
+              cacheLocale = parsed;
+            }
+          }
+        } catch(cacheErr) {
+          console.warn('Cache locale illeggibile:', cacheErr);
+        }
+
+        const remotoUpdatedAt = data && data.updated_at ? data.updated_at : null;
+        const cacheEPiuRecente = cacheLocale && (!remotoUpdatedAt || cacheLocale.updated_at > remotoUpdatedAt);
+
+        if (cacheEPiuRecente) {
+          // Cache locale vince: ripushiamo su Supabase senza sovrascriverla.
+          this.dati = migraDati(cacheLocale.data);
+          this.modalitaOffline = false;
+          this.generaIncassiAttesi();
+          this.resetFormUtenza();
+          await this.salvaSubito();
+          return;
+        }
+
         if (data && data.data && data.data.proprieta) {
-          // Dati esistenti trovati nel DB
-          this.dati = data.data;
+          // Dati esistenti trovati nel DB: applica migrazione se necessario
+          const versionePrima = data.data.dataVersion || 0;
+          const migrati = migraDati(data.data);
+          this.dati = migrati;
+          this.modalitaOffline = false;
+          if ((migrati.dataVersion || 0) !== versionePrima) {
+            await this.salvaSubito();
+          }
         } else {
           // Primo accesso: inizializza con dati di esempio e salva
           this.dati = datiEsempio();
+          this.modalitaOffline = false;
           await this.salvaSubito();
         }
         this.generaIncassiAttesi();
@@ -860,6 +997,23 @@ function app() {
         this.statoSalvataggio = 'salvato';
       } catch(e) {
         console.error('Errore caricamento dati:', e);
+        // Fallback offline: tenta lettura da cache localStorage
+        try {
+          const raw = localStorage.getItem('gestione_affitti_cache');
+          if (raw) {
+            const cache = JSON.parse(raw);
+            if (cache && cache.user_id === this.utente.id && cache.data) {
+              this.dati = migraDati(cache.data);
+              this.modalitaOffline = true;
+              this.generaIncassiAttesi();
+              this.resetFormUtenza();
+              this.statoSalvataggio = 'errore';
+              return;
+            }
+          }
+        } catch(cacheErr) {
+          console.error('Errore lettura cache offline:', cacheErr);
+        }
         this.statoSalvataggio = 'errore';
       }
     },
@@ -875,17 +1029,44 @@ function app() {
     /** Salvataggio immediato su Supabase (upsert) */
     async salvaSubito() {
       if (!this.utente) return;
+      const ora = new Date().toISOString();
+      // Aggiorna sempre la cache locale PRIMA dell'upsert: cosi se la rete
+      // cade a meta operazione le modifiche non vanno perse.
+      const scriviCache = () => {
+        try {
+          localStorage.setItem('gestione_affitti_cache', JSON.stringify({
+            data: this.dati,
+            updated_at: ora,
+            user_id: this.utente.id
+          }));
+        } catch(cacheErr) {
+          console.warn('Impossibile aggiornare cache locale:', cacheErr);
+        }
+      };
+
+      if (this.modalitaOffline) {
+        // Gia offline: scrivi solo cache, non tentare la rete.
+        scriviCache();
+        this.statoSalvataggio = 'offline';
+        return;
+      }
+
       try {
         const { error } = await sb.from('user_data').upsert({
           user_id: this.utente.id,
           data: this.dati,
-          updated_at: new Date().toISOString()
+          updated_at: ora
         });
         if (error) throw error;
+        scriviCache();
+        this.modalitaOffline = false;
         this.statoSalvataggio = 'salvato';
       } catch(e) {
         console.error('Errore salvataggio:', e);
-        this.statoSalvataggio = 'errore';
+        // Rete/RLS ko: comunque persisti in cache per non perdere le modifiche.
+        scriviCache();
+        this.modalitaOffline = true;
+        this.statoSalvataggio = 'offline';
       }
     },
 
@@ -929,7 +1110,8 @@ function app() {
               dataPrevista: dataPrevist(mese, prop.scadenzaAffitto),
               dataIncasso: null, importo: prop.importoAffittoMensile,
               bancaId: prop.bancaIncasso, girato: false,
-              dataGiro: null, bancaDestinazioneId: null, note: ''
+              dataGiro: null, bancaDestinazioneId: null,
+              currency: prop.currency || 'EUR', note: ''
             });
           }
         }
@@ -945,8 +1127,20 @@ function app() {
 
     // --- Dashboard ---
     incassiMeseCorrente() { const mc = meseCorrente(); return this.dati.incassiAffitti.filter(i => i.mese === mc); },
-    totaleIncassatoMese() { return this.incassiMeseCorrente().filter(i => i.dataIncasso).reduce((s, i) => s + (i.importo || 0), 0); },
-    totaleDaIncassareMese() { return this.incassiMeseCorrente().filter(i => !i.dataIncasso).reduce((s, i) => s + (i.importo || 0), 0); },
+    totaleIncassatoMese() {
+      return this.incassiMeseCorrente().filter(i => i.dataIncasso).reduce((acc, i) => {
+        const cur = i.currency || 'EUR';
+        acc[cur] = (acc[cur] || 0) + (i.importo || 0);
+        return acc;
+      }, { EUR: 0, USD: 0 });
+    },
+    totaleDaIncassareMese() {
+      return this.incassiMeseCorrente().filter(i => !i.dataIncasso).reduce((acc, i) => {
+        const cur = i.currency || 'EUR';
+        acc[cur] = (acc[cur] || 0) + (i.importo || 0);
+        return acc;
+      }, { EUR: 0, USD: 0 });
+    },
     statoAffittoMese(propId) {
       const inc = this.dati.incassiAffitti.find(i => i.proprietaId === propId && i.mese === meseCorrente());
       if (!inc) return '<span class="text-gray-400">\u2014</span>';
@@ -956,7 +1150,11 @@ function app() {
     },
     isRitardo(inc) { return !inc.dataIncasso && inc.dataPrevista < oggi(); },
     totaleDaGirareBanca(bancaId) {
-      return this.dati.incassiAffitti.filter(i => i.bancaId === bancaId && i.dataIncasso && !i.girato).reduce((s, i) => s + (i.importo || 0), 0);
+      return this.dati.incassiAffitti.filter(i => i.bancaId === bancaId && i.dataIncasso && !i.girato).reduce((acc, i) => {
+        const cur = i.currency || 'EUR';
+        acc[cur] = (acc[cur] || 0) + (i.importo || 0);
+        return acc;
+      }, { EUR: 0, USD: 0 });
     },
     totaleDaGirareVersoBanca(bancaDestId) {
       // Somma incassi non girati la cui proprietà ha come bancaDestinazione questa banca
@@ -964,7 +1162,11 @@ function app() {
         if (!i.dataIncasso || i.girato) return false;
         const prop = this.dati.proprieta.find(p => p.id === i.proprietaId);
         return prop && prop.bancaDestinazione === bancaDestId;
-      }).reduce((s, i) => s + (i.importo || 0), 0);
+      }).reduce((acc, i) => {
+        const cur = i.currency || 'EUR';
+        acc[cur] = (acc[cur] || 0) + (i.importo || 0);
+        return acc;
+      }, { EUR: 0, USD: 0 });
     },
     utenzeInScadenza() {
       const lim = new Date(); lim.setDate(lim.getDate() + 30);
@@ -1012,11 +1214,12 @@ function app() {
           dataPrevista: dataPrevist(mese, prop.scadenzaAffitto),
           dataIncasso: null, importo: prop.importoAffittoMensile,
           bancaId: prop.bancaIncasso, girato: false,
-          dataGiro: null, bancaDestinazioneId: null, note: ''
+          dataGiro: null, bancaDestinazioneId: null,
+          currency: prop.currency || 'EUR', note: ''
         });
         creati++;
       }
-      if (creati === 0) alert('Nessun incasso da creare: sono tutti gia presenti per ' + mese);
+      if (creati === 0) alert('Nessun incasso da creare: sono tutti già presenti per ' + mese + '.');
       else this.salva();
     },
 
@@ -1047,14 +1250,22 @@ function app() {
         .sort((a, b) => b.dataPrevista.localeCompare(a.dataPrevista));
     },
     totaleIncassiAnno(propId, anno) {
-      return this.storicoIncassiProprieta(propId, anno).filter(i => i.dataIncasso).reduce((s, i) => s + (i.importo || 0), 0);
+      return this.storicoIncassiProprieta(propId, anno).filter(i => i.dataIncasso).reduce((acc, i) => {
+        const cur = i.currency || 'EUR';
+        acc[cur] = (acc[cur] || 0) + (i.importo || 0);
+        return acc;
+      }, { EUR: 0, USD: 0 });
     },
     storicoUtenzeProprieta(propId, anno) {
       return this.dati.utenze.filter(u => u.proprietaId === propId && u.dataScadenza && u.dataScadenza.startsWith(String(anno)))
         .sort((a, b) => b.dataScadenza.localeCompare(a.dataScadenza));
     },
     totaleUtenzeAnno(propId, anno) {
-      return this.storicoUtenzeProprieta(propId, anno).reduce((s, u) => s + (u.importo || 0), 0);
+      return this.storicoUtenzeProprieta(propId, anno).reduce((acc, u) => {
+        const cur = u.currency || 'EUR';
+        acc[cur] = (acc[cur] || 0) + (u.importo || 0);
+        return acc;
+      }, { EUR: 0, USD: 0 });
     },
 
     // --- Movimenti banca ---
@@ -1063,13 +1274,27 @@ function app() {
         .sort((a, b) => (a.dataPrevista || '').localeCompare(b.dataPrevista || ''));
     },
     totaleIncassatoBancaMese(bancaId) {
-      return this.incassiBancaMese(bancaId).filter(i => i.dataIncasso).reduce((s, i) => s + (i.importo || 0), 0);
+      return this.incassiBancaMese(bancaId).filter(i => i.dataIncasso).reduce((acc, i) => {
+        const cur = i.currency || 'EUR';
+        acc[cur] = (acc[cur] || 0) + (i.importo || 0);
+        return acc;
+      }, { EUR: 0, USD: 0 });
     },
     totaleDaGirareBancaMese(bancaId) {
-      return this.incassiBancaMese(bancaId).filter(i => i.dataIncasso && !i.girato).reduce((s, i) => s + (i.importo || 0), 0);
+      return this.incassiBancaMese(bancaId).filter(i => i.dataIncasso && !i.girato).reduce((acc, i) => {
+        const cur = i.currency || 'EUR';
+        acc[cur] = (acc[cur] || 0) + (i.importo || 0);
+        return acc;
+      }, { EUR: 0, USD: 0 });
     },
     segnaGirato(inc, bancaDestId) {
       if (!bancaDestId) return;
+      const bancaOrig = this.dati.banche.find(b => b.id === inc.bancaId);
+      const bancaDest = this.dati.banche.find(b => b.id === bancaDestId);
+      if (bancaOrig && bancaDest && (bancaOrig.currency || 'EUR') !== (bancaDest.currency || 'EUR')) {
+        alert('Impossibile girare fondi tra banche con valute diverse.');
+        return;
+      }
       inc.girato = true; inc.dataGiro = oggi(); inc.bancaDestinazioneId = bancaDestId; this.salva();
     },
 
@@ -1078,7 +1303,7 @@ function app() {
       this.nuovaUtenza = {
         proprietaId: this.dati.proprieta.length > 0 ? this.dati.proprieta[0].id : '',
         tipo: 'acqua', fornitore: '', periodoRiferimento: '',
-        dataScadenza: '', importo: 0, stato: 'da_ricevere', note: ''
+        dataScadenza: '', importo: 0, stato: 'da_ricevere', currency: 'EUR', note: ''
       };
     },
     utenzeFiltrate() {
@@ -1090,9 +1315,17 @@ function app() {
         return true;
       }).sort((a, b) => (b.dataScadenza || '').localeCompare(a.dataScadenza || ''));
     },
-    totaleUtenzeFiltrate() { return this.utenzeFiltrate().reduce((s, u) => s + (u.importo || 0), 0); },
+    totaleUtenzeFiltrate() {
+      return this.utenzeFiltrate().reduce((acc, u) => {
+        const cur = u.currency || 'EUR';
+        acc[cur] = (acc[cur] || 0) + (u.importo || 0);
+        return acc;
+      }, { EUR: 0, USD: 0 });
+    },
     aggiungiUtenza() {
-      this.dati.utenze.push({ id: uid(), ...this.nuovaUtenza });
+      const prop = this.dati.proprieta.find(p => p.id === this.nuovaUtenza.proprietaId);
+      const currency = this.nuovaUtenza.currency || (prop && prop.currency) || 'EUR';
+      this.dati.utenze.push({ id: uid(), ...this.nuovaUtenza, currency });
       this.mostraFormUtenza = false; this.resetFormUtenza(); this.salva();
     },
     cambiaStatoUtenza(u, stato) {
@@ -1108,7 +1341,8 @@ function app() {
     // --- Impostazioni: Proprieta ---
     creaProprieta() {
       return { id: null, nome: '', tipo: 'appartamento', scadenzaAffitto: '1',
-        importoAffittoMensile: 0, bancaIncasso: '', intestatario: '', bancaDestinazione: '', note: '' };
+        importoAffittoMensile: 0, bancaIncasso: '', intestatario: '', bancaDestinazione: '',
+        currency: 'EUR', note: '' };
     },
     modificaProprieta(p) { this.editProprieta = { ...p }; this.mostraFormProprieta = true; },
     salvaProprieta() {
@@ -1128,7 +1362,7 @@ function app() {
     },
 
     // --- Impostazioni: Banche ---
-    creaBanca() { return { id: null, nome: '', intestatario: '' }; },
+    creaBanca() { return { id: null, nome: '', intestatario: '', currency: 'EUR' }; },
     modificaBanca(b) { this.editBanca = { ...b }; this.mostraFormBanca = true; },
     salvaBanca() {
       if (!this.editBanca.nome) return alert('Inserire il nome della banca');
@@ -1139,6 +1373,12 @@ function app() {
       this.mostraFormBanca = false; this.salva();
     },
     eliminaBanca(id) {
+      const nIncassi = this.dati.incassiAffitti.filter(i => i.bancaId === id || i.bancaDestinazioneId === id).length;
+      const nProp = this.dati.proprieta.filter(p => p.bancaIncasso === id || p.bancaDestinazione === id).length;
+      if (nIncassi + nProp > 0) {
+        alert('Impossibile eliminare: ' + nProp + ' proprietà e ' + nIncassi + ' incassi usano questa banca.');
+        return;
+      }
       if (!confirm('Eliminare questa banca?')) return;
       this.dati.banche = this.dati.banche.filter(b => b.id !== id); this.salva();
     },

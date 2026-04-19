@@ -180,8 +180,16 @@ Nella colonna **Azioni**, usa il menu "Cambia stato..." per aggiornare lo stato 
 ### Aggiungere una banca
 
 1. Nella sezione Banche, clicca **+ Nuova**
-2. Inserisci nome e intestatario
+2. Inserisci **nome**, **intestatario** e **valuta** (Euro o Dollaro USA)
 3. Clicca **Salva**
+
+### Gestire proprietà in valuta estera
+
+Ogni proprietà ha un campo **Valuta** (Euro o Dollaro USA). Gli incassi e le utenze ereditano la valuta dalla proprietà associata.
+
+- In Dashboard e nei riepiloghi, i totali sono separati per valuta (es. `3.000,00 €` e `$1.200.00` su righe distinte) — nessuna conversione automatica.
+- Un giro fondi è possibile **solo tra banche della stessa valuta**: l'app blocca trasferimenti EUR→USD o viceversa.
+- La valuta di una banca si imposta alla creazione e va scelta coerentemente con il conto reale.
 
 ---
 
@@ -189,10 +197,15 @@ Nella colonna **Azioni**, usa il menu "Cambia stato..." per aggiornare lo stato 
 
 ### Salvataggio automatico
 
-Ogni modifica viene salvata automaticamente nel **localStorage** del browser. L'indicatore in alto a destra conferma lo stato:
-- **Salvato** (verde) = tutto ok
-- **Salvataggio...** (giallo) = in corso
-- **Errore salvataggio** (rosso) = qualcosa è andato storto
+I dati sono sincronizzati su **Supabase** (cloud) e conservati in una **cache locale** del browser come copia di sicurezza. L'indicatore in alto a destra conferma lo stato:
+- **Salvato** (verde) = sincronizzato con il cloud
+- **Salvataggio…** (giallo) = in corso
+- **Offline** (giallo) = salvato solo in locale, sarà sincronizzato al ritorno online
+- **Errore** (rosso) = problema non legato alla rete
+
+### Modalità offline
+
+Se la connessione cade, l'app continua a funzionare leggendo dalla cache locale. Comparirà una barra gialla **Modalità offline**: le tue modifiche vengono salvate nel browser e spinte automaticamente sul cloud non appena torni online. In caso di conflitto (es. dispositivo offline per giorni), prevale la versione più recente.
 
 ### Su Chrome o Edge (desktop)
 
@@ -219,10 +232,13 @@ Esporta periodicamente il file JSON come backup. Se cambi browser o cancelli i d
 ## 10. Domande frequenti
 
 **I dati sono al sicuro?**
-I dati restano nel tuo browser (localStorage) o nel file JSON locale. Non vengono mai inviati a nessun server.
+I dati sono sincronizzati sul tuo account Supabase (cloud privato, protetto da autenticazione) e conservati anche in una cache locale del browser. Nessun altro utente può leggere i tuoi dati.
 
 **Posso usare l'app offline?**
-Si, dopo il primo caricamento l'app funziona anche senza connessione. Serve la connessione solo per il primo accesso (per caricare Tailwind CSS e Alpine.js dal CDN).
+Sì. Dopo il primo login, se cade la connessione l'app continua a funzionare con i dati dalla cache locale e mostra una barra "Modalità offline". Al ritorno della connessione, le modifiche vengono sincronizzate automaticamente.
+
+**Posso gestire affitti in valute diverse?**
+Sì. Ogni proprietà e ogni banca hanno un campo Valuta (Euro o Dollaro USA). I totali sono mostrati separati per valuta, senza conversione automatica.
 
 **Posso usarla su iPhone?**
 Si, funziona su qualsiasi browser. Su Safari mobile usa Esporta/Importa JSON per i backup.

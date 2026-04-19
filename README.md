@@ -17,18 +17,19 @@ Web app single-page in italiano per la gestione affitti immobili e utenze.
 
 - Singolo file `index.html`, nessuna build necessaria
 - Alpine.js + Tailwind CSS via CDN
-- Offline-first: funziona senza server
-- Persistenza dati via File System Access API (Chrome/Edge) o localStorage + export/import JSON (Safari)
+- Autenticazione e sync cloud via Supabase (email/password)
+- Offline-first: cache locale automatica, sync al ritorno della connessione
+- Multi-valuta per proprietà e banca (Euro, Dollaro USA — totali separati, niente conversione)
 - Salvataggio automatico ad ogni modifica
 - Tema chiaro/scuro automatico
-- Formato italiano: valuta (1.234,56 €), date (gg/mm/aaaa)
-- Responsive: ottimizzato per Mac e iPad
+- Formato italiano per EUR (1.234,56 €), formato en-US per USD ($1,234.56), date gg/mm/aaaa
+- Responsive: ottimizzato per mobile, tablet e desktop
 
 ## Utilizzo
 
 Apri [https://oldpz.github.io/gestione-affitti/](https://oldpz.github.io/gestione-affitti/) da qualsiasi browser.
 
-I dati sono salvati nel localStorage del browser. Per sincronizzare tra dispositivi usa i pulsanti **Esporta JSON** / **Importa JSON**, oppure su Chrome/Edge il pulsante **Apri dati.json** per leggere/scrivere su iCloud Drive o Dropbox.
+Registrati con email/password: i dati vengono sincronizzati sul tuo account Supabase e conservati anche in una cache locale del browser. Se la connessione cade, l'app continua a funzionare in modalità offline e sincronizza al ritorno della rete.
 
 ## Tutorial
 
