@@ -32,20 +32,87 @@
   </script>
   <style>
     [x-cloak] { display: none !important; }
+    html, body { overflow-x: hidden; }
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 3px; }
     .page-enter { animation: fadeIn 0.15s ease-out; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
     .table-dense th, .table-dense td { padding: 0.35rem 0.5rem; font-size: 0.8rem; }
+
+    /* Sfondo bandiera USA animata */
+    @keyframes usa-flag-wave {
+      0%, 100% { transform: translateX(-2%) skewY(-1deg); }
+      50%      { transform: translateX(2%)  skewY(1deg);  }
+    }
+    .usa-flag-bg { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+    .usa-flag-bg svg {
+      position: absolute; top: -10%; left: -10%;
+      width: 120%; height: 120%;
+      opacity: 0.10;
+      animation: usa-flag-wave 8s ease-in-out infinite;
+      transform-origin: center;
+      filter: blur(0.5px);
+    }
+    @media (prefers-color-scheme: dark) {
+      .usa-flag-bg svg { opacity: 0.07; }
+    }
+    .usa-flag-bg::after {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(180deg, rgba(249,250,251,0.62) 0%, rgba(249,250,251,0.78) 100%);
+      backdrop-filter: blur(1.5px);
+    }
+    @media (prefers-color-scheme: dark) {
+      .usa-flag-bg::after {
+        background: linear-gradient(180deg, rgba(17,24,39,0.70) 0%, rgba(17,24,39,0.85) 100%);
+      }
+    }
+    body > *:not(.usa-flag-bg) { position: relative; z-index: 1; }
+
+    /* Pallino animato per stato salvataggio */
+    @keyframes pulse-dot { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .status-dot { width: 0.5rem; height: 0.5rem; border-radius: 9999px; display: inline-block; }
+    .status-dot.pulsing { animation: pulse-dot 1.2s ease-in-out infinite; }
   </style>
 </head>
-<body class="bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200 min-h-screen">
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200 min-h-screen antialiased">
+
+<div class="usa-flag-bg" aria-hidden="true">
+  <svg viewBox="0 0 760 400" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+    <rect width="760" height="400" fill="#B22234"/>
+    <g fill="#FFFFFF">
+      <rect y="30.77"  width="760" height="30.77"/>
+      <rect y="92.31"  width="760" height="30.77"/>
+      <rect y="153.85" width="760" height="30.77"/>
+      <rect y="215.38" width="760" height="30.77"/>
+      <rect y="276.92" width="760" height="30.77"/>
+      <rect y="338.46" width="760" height="30.77"/>
+    </g>
+    <rect width="304" height="215.38" fill="#3C3B6E"/>
+    <g fill="#FFFFFF">
+      <g id="flag-row-a">
+        <circle cx="25" cy="20" r="6"/><circle cx="75" cy="20" r="6"/><circle cx="125" cy="20" r="6"/>
+        <circle cx="175" cy="20" r="6"/><circle cx="225" cy="20" r="6"/><circle cx="275" cy="20" r="6"/>
+      </g>
+      <use href="#flag-row-a" y="43"/>
+      <use href="#flag-row-a" y="86"/>
+      <use href="#flag-row-a" y="129"/>
+      <use href="#flag-row-a" y="172"/>
+      <g id="flag-row-b">
+        <circle cx="50" cy="42" r="6"/><circle cx="100" cy="42" r="6"/><circle cx="150" cy="42" r="6"/>
+        <circle cx="200" cy="42" r="6"/><circle cx="250" cy="42" r="6"/>
+      </g>
+      <use href="#flag-row-b" y="43"/>
+      <use href="#flag-row-b" y="86"/>
+      <use href="#flag-row-b" y="129"/>
+    </g>
+  </svg>
+</div>
 
 <div x-data="app()" x-init="init()" x-cloak class="flex flex-col min-h-screen">
 
   <!-- ===== SCHERMATA DI LOGIN ===== -->
   <div x-show="!utente && !caricamentoIniziale" class="min-h-screen flex items-center justify-center p-4">
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-6 w-full max-w-md">
+    <div class="bg-white/90 dark:bg-gray-800/90 backdrop-blur-md rounded-2xl shadow-2xl ring-1 ring-gray-200 dark:ring-gray-700 p-6 w-full max-w-md">
       <h1 class="text-xl font-bold text-primary-700 dark:text-primary-400 mb-1">Gestione Affitti</h1>
       <p class="text-sm text-gray-500 dark:text-gray-400 mb-5" x-text="modalitaAuth === 'login' ? 'Accedi al tuo account' : 'Crea un nuovo account'"></p>
 
@@ -67,7 +134,7 @@
         <div x-show="authInfo" class="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded px-3 py-2 text-xs text-green-700 dark:text-green-300" x-text="authInfo"></div>
 
         <button type="submit" :disabled="authLoading"
-                class="w-full bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white rounded py-2 text-sm font-semibold transition-colors">
+                class="w-full bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white rounded-lg py-2 text-sm font-semibold shadow-sm transition active:scale-[0.98]">
           <span x-show="!authLoading" x-text="modalitaAuth === 'login' ? 'Accedi' : 'Registrati'"></span>
           <span x-show="authLoading">Attendere...</span>
         </button>
@@ -101,7 +168,7 @@
   <div class="flex flex-col min-h-screen">
 
   <!-- ===== HEADER / NAVIGAZIONE ===== -->
-  <header class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
+  <header class="bg-gradient-to-r from-white via-gray-50 to-white dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 border-b border-gray-200 dark:border-gray-700 shadow-sm sticky top-0 z-50 backdrop-blur-sm bg-white/90 dark:bg-gray-800/90">
     <!-- Barra principale -->
     <div class="max-w-7xl mx-auto px-3 sm:px-4 flex items-center justify-between h-12 gap-2">
       <!-- Logo + hamburger mobile -->
@@ -123,21 +190,21 @@
       <nav class="hidden lg:flex gap-1 text-sm">
         <template x-for="v in viste" :key="v.id">
           <button @click="vistaCorrente = v.id"
-                  :class="vistaCorrente === v.id ? 'bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300 font-semibold' : 'hover:bg-gray-100 dark:hover:bg-gray-700'"
-                  class="px-3 py-1.5 rounded-md whitespace-nowrap transition-colors"
+                  :class="vistaCorrente === v.id ? 'border-primary-600 text-primary-700 dark:text-primary-300 font-semibold' : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'"
+                  class="px-3 py-1.5 border-b-2 whitespace-nowrap transition-colors"
                   x-text="v.label"></button>
         </template>
       </nav>
 
       <!-- Info utente + logout -->
       <div class="flex items-center gap-1.5 sm:gap-2 text-xs shrink-0">
-        <span x-show="statoSalvataggio === 'salvato'" class="text-green-600 dark:text-green-400 hidden sm:inline">Salvato</span>
-        <span x-show="statoSalvataggio === 'salvato'" class="text-green-600 dark:text-green-400 sm:hidden" title="Salvato">&#10003;</span>
-        <span x-show="statoSalvataggio === 'salvataggio'" class="text-yellow-600 dark:text-yellow-400">...</span>
-        <span x-show="statoSalvataggio === 'errore'" class="text-red-600 dark:text-red-400" title="Errore">&#9888;</span>
-        <span x-show="statoSalvataggio === 'offline'" class="text-yellow-600 dark:text-yellow-400" title="Salvato solo in locale">&#9737;</span>
+        <span class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs ring-1 ring-gray-200 dark:ring-gray-700 bg-white/70 dark:bg-gray-800/70">
+          <span class="status-dot" :class="{ 'bg-green-500': statoSalvataggio==='salvato', 'bg-amber-500 pulsing': statoSalvataggio==='salvataggio', 'bg-yellow-500': statoSalvataggio==='offline', 'bg-red-500': statoSalvataggio==='errore' }"></span>
+          <span x-text="statoSalvataggio==='salvato' ? 'Salvato' : statoSalvataggio==='salvataggio' ? 'Salvataggio…' : statoSalvataggio==='offline' ? 'Offline' : 'Errore'"></span>
+        </span>
+        <span class="sm:hidden status-dot" :class="{ 'bg-green-500': statoSalvataggio==='salvato', 'bg-amber-500 pulsing': statoSalvataggio==='salvataggio', 'bg-yellow-500': statoSalvataggio==='offline', 'bg-red-500': statoSalvataggio==='errore' }" :title="statoSalvataggio"></span>
         <span class="text-gray-500 dark:text-gray-400 hidden md:inline truncate max-w-[150px]" x-text="utente?.email"></span>
-        <button @click="eseguiLogout()" class="px-2 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-xs">Esci</button>
+        <button @click="eseguiLogout()" class="px-2.5 py-1 bg-red-500 hover:bg-red-600 text-white rounded-lg text-xs font-medium shadow-sm transition active:scale-95">Esci</button>
       </div>
     </div>
 
@@ -172,19 +239,19 @@
     <div x-show="vistaCorrente === 'dashboard'" class="page-enter">
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
         <h2 class="text-lg font-bold" x-text="'Dashboard — ' + nomeMeseCorrente()"></h2>
-        <div class="grid grid-cols-2 sm:flex sm:gap-4 gap-2 text-xs sm:text-sm">
-          <div class="bg-white dark:bg-gray-800 sm:bg-transparent p-2 sm:p-0 rounded sm:rounded-none border sm:border-0 border-gray-200 dark:border-gray-700">
-            <div class="text-gray-500 sm:hidden">Incassato</div>
-            <div class="font-semibold flex flex-wrap gap-x-2 items-baseline"><span class="hidden sm:inline">Totale incassato:</span>
+        <div class="grid grid-cols-2 sm:flex sm:gap-3 gap-2 text-xs sm:text-sm">
+          <div class="rounded-2xl shadow-sm ring-1 ring-gray-200 dark:ring-gray-700 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm p-3 sm:px-4 sm:py-2.5">
+            <div class="text-[10px] sm:text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">Incassato</div>
+            <div class="text-base sm:text-lg font-semibold flex flex-wrap gap-x-2 items-baseline">
               <template x-for="cur in ['EUR','USD']" :key="cur">
                 <span x-show="totaleIncassatoMese()[cur] > 0" x-text="formatValuta(totaleIncassatoMese()[cur], cur)" class="text-green-600 dark:text-green-400"></span>
               </template>
               <span x-show="totaleIncassatoMese().EUR === 0 && totaleIncassatoMese().USD === 0" class="text-green-600 dark:text-green-400" x-text="formatValuta(0, 'EUR')"></span>
             </div>
           </div>
-          <div class="bg-white dark:bg-gray-800 sm:bg-transparent p-2 sm:p-0 rounded sm:rounded-none border sm:border-0 border-gray-200 dark:border-gray-700">
-            <div class="text-gray-500 sm:hidden">Da incassare</div>
-            <div class="font-semibold flex flex-wrap gap-x-2 items-baseline"><span class="hidden sm:inline">Da incassare:</span>
+          <div class="rounded-2xl shadow-sm ring-1 ring-gray-200 dark:ring-gray-700 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm p-3 sm:px-4 sm:py-2.5">
+            <div class="text-[10px] sm:text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">Da incassare</div>
+            <div class="text-base sm:text-lg font-semibold flex flex-wrap gap-x-2 items-baseline">
               <template x-for="cur in ['EUR','USD']" :key="cur">
                 <span x-show="totaleDaIncassareMese()[cur] > 0" x-text="formatValuta(totaleDaIncassareMese()[cur], cur)" class="text-yellow-600 dark:text-yellow-400"></span>
               </template>
@@ -196,7 +263,7 @@
       <!-- Card proprieta -->
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
         <template x-for="p in dati.proprieta" :key="p.id">
-          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 cursor-pointer hover:shadow-md transition-shadow"
+          <div class="bg-white dark:bg-gray-800 rounded-xl ring-1 ring-gray-200 dark:ring-gray-700 p-3 cursor-pointer transition duration-200 hover:shadow-lg hover:-translate-y-0.5 hover:ring-primary-300 dark:hover:ring-primary-700"
                @click="apriProprieta(p.id)">
             <div class="flex items-center justify-between mb-2">
               <h3 class="font-semibold text-sm" x-text="p.nome"></h3>
@@ -264,7 +331,7 @@
           <button @click="meseCalendario++; if(meseCalendario>11){meseCalendario=0;annoCalendario++}" class="px-3 py-1.5 rounded bg-gray-200 dark:bg-gray-700 text-sm">&rarr;</button>
         </div>
         <div class="flex gap-2">
-          <button @click="generaIncassiMeseVisualizzato()" class="w-full sm:w-auto px-3 py-1.5 bg-primary-500 hover:bg-primary-600 text-white rounded text-xs">+ Genera incassi mancanti</button>
+          <button @click="generaIncassiMeseVisualizzato()" class="w-full sm:w-auto px-3 py-1.5 bg-primary-500 hover:bg-primary-600 text-white rounded-lg text-xs font-medium shadow-sm transition active:scale-95">+ Genera incassi mancanti</button>
         </div>
       </div>
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -283,7 +350,7 @@
                     <span x-show="inc.dataIncasso" class="text-green-600 text-sm">&#10003;</span>
                     <span x-show="!inc.dataIncasso && isRitardo(inc)" class="text-red-500 text-sm">&#9888;</span>
                     <button x-show="!inc.dataIncasso" @click="segnaIncassatoOggi(inc)"
-                            class="px-2 py-1 text-xs bg-green-500 hover:bg-green-600 text-white rounded whitespace-nowrap"><span class="hidden sm:inline">Incassa oggi</span><span class="sm:hidden">Incassa</span></button>
+                            class="px-2.5 py-1 text-xs bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium shadow-sm hover:shadow transition active:scale-95 whitespace-nowrap"><span class="hidden sm:inline">Incassa oggi</span><span class="sm:hidden">Incassa</span></button>
                     <button @click="apriFormIncasso(inc)" class="p-1.5 text-xs bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 rounded" title="Modifica">&#9998;</button>
                     <button @click="eliminaIncasso(inc.id)" class="p-1.5 text-xs text-red-500 hover:text-red-700" title="Elimina">&#10005;</button>
                   </div>
@@ -298,8 +365,8 @@
       </div>
 
       <!-- Modal modifica incasso -->
-      <div x-show="incassoInModifica" x-cloak class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div class="bg-white dark:bg-gray-800 rounded-lg p-4 w-full max-w-md" @click.away="incassoInModifica = null">
+      <div x-show="incassoInModifica" x-cloak class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-4 w-full max-w-md" @click.away="incassoInModifica = null">
           <h3 class="font-bold text-base mb-3">Modifica incasso</h3>
           <template x-if="incassoInModifica">
             <div class="space-y-3">
@@ -524,7 +591,7 @@
         <select x-model.number="filtroUtenzeAnno" class="text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600">
           <template x-for="a in anniDisponibili()" :key="a"><option :value="a" x-text="a"></option></template>
         </select>
-        <button @click="mostraFormUtenza = true" class="px-3 py-1 bg-primary-500 text-white rounded text-sm hover:bg-primary-600">+ Nuova utenza</button>
+        <button @click="mostraFormUtenza = true" class="px-3 py-1.5 bg-primary-500 hover:bg-primary-600 text-white rounded-lg text-sm font-medium shadow-sm transition active:scale-95">+ Nuova utenza</button>
       </div>
       <!-- Form nuova utenza -->
       <div x-show="mostraFormUtenza" class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 mb-4">
