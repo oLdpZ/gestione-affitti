@@ -39,31 +39,28 @@
     @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
     .table-dense th, .table-dense td { padding: 0.35rem 0.5rem; font-size: 0.8rem; }
 
-    /* Sfondo bandiera USA animata */
-    @keyframes usa-flag-wave {
-      0%, 100% { transform: translateX(-2%) skewY(-1deg); }
-      50%      { transform: translateX(2%)  skewY(1deg);  }
-    }
+    /* Sfondo video fullscreen */
     .usa-flag-bg { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
-    .usa-flag-bg svg {
-      position: absolute; top: -10%; left: -10%;
-      width: 120%; height: 120%;
-      opacity: 0.10;
-      animation: usa-flag-wave 8s ease-in-out infinite;
-      transform-origin: center;
-      filter: blur(0.5px);
+    .usa-flag-bg video {
+      position: absolute;
+      top: 50%; left: 50%;
+      min-width: 100%; min-height: 100%;
+      width: auto; height: auto;
+      transform: translate(-50%, -50%);
+      object-fit: cover;
+      opacity: 0.35;
     }
     @media (prefers-color-scheme: dark) {
-      .usa-flag-bg svg { opacity: 0.07; }
+      .usa-flag-bg video { opacity: 0.28; }
     }
     .usa-flag-bg::after {
       content: ''; position: absolute; inset: 0;
-      background: linear-gradient(180deg, rgba(249,250,251,0.62) 0%, rgba(249,250,251,0.78) 100%);
+      background: linear-gradient(180deg, rgba(249,250,251,0.70) 0%, rgba(249,250,251,0.82) 100%);
       backdrop-filter: blur(1.5px);
     }
     @media (prefers-color-scheme: dark) {
       .usa-flag-bg::after {
-        background: linear-gradient(180deg, rgba(17,24,39,0.70) 0%, rgba(17,24,39,0.85) 100%);
+        background: linear-gradient(180deg, rgba(17,24,39,0.78) 0%, rgba(17,24,39,0.88) 100%);
       }
     }
     body > *:not(.usa-flag-bg) { position: relative; z-index: 1; }
@@ -77,35 +74,9 @@
 <body class="bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200 min-h-screen antialiased">
 
 <div class="usa-flag-bg" aria-hidden="true">
-  <svg viewBox="0 0 760 400" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
-    <rect width="760" height="400" fill="#B22234"/>
-    <g fill="#FFFFFF">
-      <rect y="30.77"  width="760" height="30.77"/>
-      <rect y="92.31"  width="760" height="30.77"/>
-      <rect y="153.85" width="760" height="30.77"/>
-      <rect y="215.38" width="760" height="30.77"/>
-      <rect y="276.92" width="760" height="30.77"/>
-      <rect y="338.46" width="760" height="30.77"/>
-    </g>
-    <rect width="304" height="215.38" fill="#3C3B6E"/>
-    <g fill="#FFFFFF">
-      <g id="flag-row-a">
-        <circle cx="25" cy="20" r="6"/><circle cx="75" cy="20" r="6"/><circle cx="125" cy="20" r="6"/>
-        <circle cx="175" cy="20" r="6"/><circle cx="225" cy="20" r="6"/><circle cx="275" cy="20" r="6"/>
-      </g>
-      <use href="#flag-row-a" y="43"/>
-      <use href="#flag-row-a" y="86"/>
-      <use href="#flag-row-a" y="129"/>
-      <use href="#flag-row-a" y="172"/>
-      <g id="flag-row-b">
-        <circle cx="50" cy="42" r="6"/><circle cx="100" cy="42" r="6"/><circle cx="150" cy="42" r="6"/>
-        <circle cx="200" cy="42" r="6"/><circle cx="250" cy="42" r="6"/>
-      </g>
-      <use href="#flag-row-b" y="43"/>
-      <use href="#flag-row-b" y="86"/>
-      <use href="#flag-row-b" y="129"/>
-    </g>
-  </svg>
+  <video autoplay loop muted playsinline preload="auto" disablepictureinpicture disableremoteplayback>
+    <source src="276973.mp4" type="video/mp4">
+  </video>
 </div>
 
 <div x-data="app()" x-init="init()" x-cloak class="flex flex-col min-h-screen">
