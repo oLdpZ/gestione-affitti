@@ -297,9 +297,9 @@
     <div x-show="vistaCorrente === 'calendario'" class="page-enter">
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
         <div class="flex items-center gap-2">
-          <button @click="meseCalendario--; if(meseCalendario<0){meseCalendario=11;annoCalendario--}" class="px-3 py-1.5 rounded bg-gray-200 dark:bg-gray-700 text-sm">&larr;</button>
+          <button type="button" @click.stop.prevent.debounce.250ms="meseCalendario--; if(meseCalendario<0){meseCalendario=11;annoCalendario--}" class="px-3 py-1.5 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-sm transition active:scale-95" aria-label="Mese precedente">&larr;</button>
           <h2 class="text-lg font-bold flex-1 text-center sm:text-left" x-text="nomiMesi[meseCalendario] + ' ' + annoCalendario"></h2>
-          <button @click="meseCalendario++; if(meseCalendario>11){meseCalendario=0;annoCalendario++}" class="px-3 py-1.5 rounded bg-gray-200 dark:bg-gray-700 text-sm">&rarr;</button>
+          <button type="button" @click.stop.prevent.debounce.250ms="meseCalendario++; if(meseCalendario>11){meseCalendario=0;annoCalendario++}" class="px-3 py-1.5 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-sm transition active:scale-95" aria-label="Mese successivo">&rarr;</button>
         </div>
         <div class="flex gap-2">
           <button @click="generaIncassiMeseVisualizzato()" class="w-full sm:w-auto px-3 py-1.5 bg-primary-500 hover:bg-primary-600 text-white rounded-lg text-xs font-medium shadow-sm transition active:scale-95">+ Genera incassi mancanti</button>
@@ -320,9 +320,11 @@
                   <div class="flex items-center gap-1 shrink-0">
                     <span x-show="inc.dataIncasso" class="text-green-600 text-sm">&#10003;</span>
                     <span x-show="!inc.dataIncasso && isRitardo(inc)" class="text-red-500 text-sm">&#9888;</span>
-                    <button x-show="!inc.dataIncasso" @click="segnaIncassatoOggi(inc)"
-                            class="px-2.5 py-1 text-xs bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium shadow-sm hover:shadow transition active:scale-95 whitespace-nowrap"><span class="hidden sm:inline">Incassa oggi</span><span class="sm:hidden">Incassa</span></button>
-                    <button @click="apriFormIncasso(inc)" class="p-1.5 text-xs bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 rounded" title="Modifica">&#9998;</button>
+                    <button type="button" x-show="!inc.dataIncasso" @click="segnaIncassatoOggi(inc)"
+                            class="px-2.5 py-1 text-xs bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium shadow-sm hover:shadow transition active:scale-95 whitespace-nowrap"><span class="hidden sm:inline">Incassa oggi</span><span class="sm:hidden">Oggi</span></button>
+                    <button type="button" x-show="!inc.dataIncasso" @click="incassaConData(inc)"
+                            class="px-2 py-1 text-xs bg-green-600/80 hover:bg-green-700 text-white rounded-lg font-medium shadow-sm transition active:scale-95 whitespace-nowrap" title="Incassa con data personalizzata (per storico)">Data…</button>
+                    <button type="button" @click="apriFormIncasso(inc)" class="p-1.5 text-xs bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 rounded-lg" title="Modifica">&#9998;</button>
                     <button @click="eliminaIncasso(inc.id)" class="p-1.5 text-xs text-red-500 hover:text-red-700" title="Elimina">&#10005;</button>
                   </div>
                 </div>
@@ -490,7 +492,10 @@
         <template x-for="b in dati.banche" :key="b.id">
           <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
             <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-3">
-              <h3 class="font-bold" x-text="b.nome + ' — ' + b.intestatario"></h3>
+              <h3 class="font-bold flex items-center gap-2 flex-wrap">
+                <span x-text="b.nome + ' — ' + b.intestatario"></span>
+                <span class="text-xs px-1.5 py-0.5 rounded-md bg-gray-100 dark:bg-gray-700 font-normal text-gray-600 dark:text-gray-300" x-text="b.currency || 'EUR'"></span>
+              </h3>
               <div class="text-sm flex flex-wrap gap-x-4 gap-y-1 items-baseline">
                 <span class="inline-flex flex-wrap gap-2 items-baseline">Incassato:
                   <template x-for="cur in ['EUR','USD']" :key="cur">
@@ -918,6 +923,23 @@ function app() {
       window.addEventListener('offline', () => {
         this.modalitaOffline = true;
       });
+
+      // Flush salvataggio pendente prima di chiudere la scheda: evita perdita dati
+      // se l'utente refresha mentre il debounce di salva() e ancora in attesa.
+      window.addEventListener('beforeunload', (e) => {
+        if (this.debounceTimer) {
+          clearTimeout(this.debounceTimer);
+          this.debounceTimer = null;
+          // Cache eager gia scritta in salva(): qui tentiamo il push rete in modo
+          // best-effort. Se fallisce non blocchiamo la chiusura: al prossimo load
+          // il conflict resolution ripushera la cache piu recente.
+          try { this.salvaSubito(); } catch(_) {}
+          if (this.statoSalvataggio === 'salvataggio') {
+            e.preventDefault();
+            e.returnValue = '';
+          }
+        }
+      });
     },
 
     // --- Autenticazione ---
@@ -1056,10 +1078,19 @@ function app() {
       }
     },
 
-    /** Salvataggio con debounce (300ms) per evitare richieste eccessive */
+    /** Salvataggio con debounce (300ms) per evitare richieste eccessive.
+     *  La cache locale viene scritta SUBITO (non aspetta il debounce) per
+     *  proteggere dai refresh mentre il timer e pending. */
     salva() {
       if (!this.utente) return;
       this.statoSalvataggio = 'salvataggio';
+      try {
+        localStorage.setItem('gestione_affitti_cache', JSON.stringify({
+          data: this.dati,
+          updated_at: new Date().toISOString(),
+          user_id: this.utente.id
+        }));
+      } catch(e) { console.warn('Cache eager fallita:', e); }
       clearTimeout(this.debounceTimer);
       this.debounceTimer = setTimeout(() => this.salvaSubito(), 300);
     },
@@ -1239,6 +1270,12 @@ function app() {
     },
     segnaIncassatoOggi(inc) { inc.dataIncasso = oggi(); this.salva(); },
 
+    /** Apre il modal di modifica incasso con data precompilata a oggi ma editabile.
+     *  Utile per popolare lo storico: l'utente digita la data reale dell'incasso. */
+    incassaConData(inc) {
+      this.incassoInModifica = { ...inc, dataIncasso: inc.dataIncasso || oggi() };
+    },
+
     // Genera incassi mancanti per il mese attualmente visualizzato nel calendario
     // (utile per mesi passati o futuri non ancora auto-generati)
     generaIncassiMeseVisualizzato() {
@@ -1385,6 +1422,21 @@ function app() {
     modificaProprieta(p) { this.editProprieta = { ...p }; this.mostraFormProprieta = true; },
     salvaProprieta() {
       if (!this.editProprieta.nome) return alert('Inserire il nome');
+      // Warning soft se banca incasso/destinazione hanno valuta diversa dalla proprieta
+      const valutaProp = this.editProprieta.currency || 'EUR';
+      const bancaIncasso = this.dati.banche.find(b => b.id === this.editProprieta.bancaIncasso);
+      const bancaDest = this.dati.banche.find(b => b.id === this.editProprieta.bancaDestinazione);
+      const conflitti = [];
+      if (bancaIncasso && (bancaIncasso.currency || 'EUR') !== valutaProp) {
+        conflitti.push(`banca di incasso "${bancaIncasso.nome}" (${bancaIncasso.currency || 'EUR'})`);
+      }
+      if (bancaDest && (bancaDest.currency || 'EUR') !== valutaProp) {
+        conflitti.push(`banca di destinazione "${bancaDest.nome}" (${bancaDest.currency || 'EUR'})`);
+      }
+      if (conflitti.length > 0) {
+        const ok = confirm(`Attenzione: la proprieta e in ${valutaProp} ma ${conflitti.join(' e ')} ha valuta diversa.\n\nContinuare comunque?`);
+        if (!ok) return;
+      }
       if (this.editProprieta.id) {
         const idx = this.dati.proprieta.findIndex(p => p.id === this.editProprieta.id);
         if (idx >= 0) this.dati.proprieta[idx] = { ...this.editProprieta };
