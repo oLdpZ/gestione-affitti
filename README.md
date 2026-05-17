@@ -38,3 +38,55 @@ Guida completa passo-passo con istruzioni per ogni sezione dell'app:
 **[Leggi il tutorial](TUTORIAL.md)**
 
 Contenuti: primo avvio, registrare incassi, calendario, scheda proprietà, giro fondi tra banche, gestione utenze, impostazioni, salvataggio e sincronizzazione dati, FAQ.
+
+## Test suite (Playwright, da PR5)
+
+La suite Playwright protegge le 5 regressioni LOCKED (CON-017) + 5 critical paths definiti in `.planning/intel/constraints.md`. Tre test girano LIVE oggi (login, crea proprieta, segna incasso + tutte e 5 le regression); due (cestino, offline sync) sono `test.skip` finche non arrivano rispettivamente PR1 e PR2b.
+
+### Esecuzione locale
+
+Prerequisiti una tantum:
+- Node 20+
+- 5 variabili d'ambiente per il progetto Supabase di test — vedi `.planning/phases/01-pr5-test-infrastructure/01-SUPABASE-TEST-SETUP.md`
+
+```bash
+npm ci
+npx playwright install chromium --with-deps
+
+# Esporta le 5 variabili (in una shell o in .env.test caricato da te)
+export SUPABASE_TEST_URL=...
+export SUPABASE_SERVICE_KEY=...   # service_role, MAI committato
+export TEST_EMAIL=...
+export TEST_PASSWORD=...
+export TEST_USER_ID=...
+
+# Suite completa
+npm test
+
+# Singolo file
+npx playwright test tests/login.spec.ts
+
+# Headed (vedi il browser)
+npm run test:headed
+
+# Report HTML dopo un fallimento
+npx playwright show-report
+```
+
+Playwright avvia automaticamente `npx serve . -l 3000` come static server (vedi `playwright.config.ts`); non serve avviarlo a mano.
+
+### Contratto CI gating
+
+- Trigger: ogni `git push` su `master` (oltre a `workflow_dispatch` manuale)
+- Job: `test` su `ubuntu-latest`, timeout 15 min, chromium-only, retry x2 in CI, workers=1
+- Esito ROSSO -> il deploy GitHub Pages viene bloccato (Pages e' "Deploy from a branch"; il gate e' una branch protection rule su `master` con required status check `Playwright Tests` — vedi setup doc)
+- Esito VERDE -> deploy procede
+- Su fallimento gli artefatti `playwright-report/` e `test-results/` (screenshot + video + trace) sono caricati come artifact del workflow (retention 7 giorni)
+
+### Le 5 regression test LOCKED (CON-017 — non rimovibili senza ADR superseding)
+
+1. REGRESSION-01 — Proprieta con `importoAffittoMensile=0` appare sul calendario come card gialla "Sistema" (`tests/calendario.spec.ts`)
+2. REGRESSION-02 — "Genera incassi mancanti" elenca esplicitamente le proprieta saltate (`tests/calendario.spec.ts`)
+3. REGRESSION-03 — Service worker stale unregistered al boot (`tests/sw.spec.ts`)
+4. REGRESSION-04 — Importo=0 al salvataggio mostra confirm soft (`tests/login.spec.ts`)
+5. REGRESSION-05 — Incassi orfani appaiono nel gruppo dedicato sul calendario (`tests/calendario.spec.ts`)
