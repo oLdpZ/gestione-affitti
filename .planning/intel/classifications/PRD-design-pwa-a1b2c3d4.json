@@ -1,0 +1,24 @@
+{
+  "source_path": "C:\\Users\\old_p\\Documents\\progetto ap Stefano\\progetto app Stefano\\docs\\ingest\\PRD-design-pwa.md",
+  "type": "PRD",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "Gestione Affitti — PWA seria + reliability layer",
+  "summary": "Design doc PRD per redesign PWA di gestione-affitti: data safety, offline-first sync, notifiche/foto/PDF in 3 PR, approccio B selezionato.",
+  "scope": [
+    "gestione-affitti PWA",
+    "data safety (soft-delete, snapshot, undo, cestino)",
+    "offline-first sync (service worker, mutation queue, IndexedDB)",
+    "schema migration Supabase (blob → tabelle per-entità)",
+    "notifiche locali utenze",
+    "foto utenze/ricevute via Supabase Storage",
+    "ricevute PDF (jsPDF)",
+    "install prompt PWA"
+  ],
+  "cross_refs": [
+    "gestione-affitti"
+  ],
+  "locked": false,
+  "precedence": 2,
+  "notes": ""
+}

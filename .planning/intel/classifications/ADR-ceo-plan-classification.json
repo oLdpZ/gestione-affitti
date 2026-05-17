@@ -1,0 +1,36 @@
+{
+  "source_path": "C:\\Users\\old_p\\Documents\\progetto ap Stefano\\progetto app Stefano\\docs\\ingest\\ADR-ceo-plan.md",
+  "type": "ADR",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "CEO Plan: Gestione Affitti — PWA + Reliability + Delight",
+  "summary": "Locked CEO+Eng plan for gestione-affitti: 8 cherry-picks accepted, PR sequence PR5-PR0-PR1-PR2a-PR2b-PR3-PR4, schema migration, risks, rollout.",
+  "scope": [
+    "gestione-affitti",
+    "PWA shell (manifest + service worker)",
+    "Supabase schema per-entity (proprieta, incassi_affitti, utenze, banche, inquilini, tipi_utenza)",
+    "Offline mutation queue (IndexedDB)",
+    "Conflict resolution per-entita",
+    "Data safety net (soft-delete, cestino, snapshot ring buffer)",
+    "Apple/Sonoma redesign (PR0)",
+    "Playwright E2E in CI (PR5)",
+    "OCR bollette Tesseract.js",
+    "Statistiche annuali Chart.js",
+    "Ricevute PDF jsPDF + inquilini",
+    "Export CSV/PDF 730 commercialista",
+    "Notifiche locali utenze",
+    "Supabase Storage foto utenze/ricevute",
+    "Bundle lazy-load",
+    "Schema migration rollout (dual-write window)"
+  ],
+  "cross_refs": [
+    "gestione-affitti-design-pwa-20260517.md",
+    "gestione-affitti-test-plan-20260517.md",
+    "TUTORIAL.md",
+    "TODOS.md",
+    ".design-ref/"
+  ],
+  "locked": true,
+  "precedence": 0,
+  "notes": "Manifest-declared ADR with precedence 0 (highest). Status ACTIVE + supersedes prior design doc + explicit 'LOCKED decisions from CEO+Eng review'. Captures: PR ordering (PR5->PR0->PR1->PR2a->PR2b->PR3->PR4), 8 accepted scope decisions, NOT-in-scope list, risk register R1-R6, dual-write rollout for PR2b, FK-aware mutation queue ordering, iOS Safari SW lifecycle mitigation, bundle lazy-loading constraints, stack lock (Alpine + Tailwind CDN + no build step), single-file HTML preserved, family-tier 1-3 users."
+}

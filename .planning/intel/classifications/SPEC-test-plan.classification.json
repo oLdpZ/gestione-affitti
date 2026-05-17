@@ -1,0 +1,31 @@
+{
+  "source_path": "C:\\Users\\old_p\\Documents\\progetto ap Stefano\\progetto app Stefano\\docs\\ingest\\SPEC-test-plan.md",
+  "type": "SPEC",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "Test Plan — Gestione Affitti PWA Rebuild",
+  "summary": "Test plan defining critical paths, per-PR interaction checks, edge cases, and locked regression tests for the gestione-affitti PWA rebuild.",
+  "scope": [
+    "login/signup flow",
+    "dashboard",
+    "calendario view",
+    "proprieta CRUD",
+    "impostazioni (cestino, snapshot, salute dati)",
+    "PWA install + service worker",
+    "offline sync + mutation queue",
+    "notifiche scadenze",
+    "foto bollette + Supabase Storage",
+    "PDF ricevute + Export 730",
+    "statistiche + OCR Tesseract",
+    "Playwright CI suite (PR5)",
+    "regression: importo=0 calendar bug"
+  ],
+  "cross_refs": [
+    "/plan-eng-review",
+    "/qa",
+    "/qa-only"
+  ],
+  "locked": false,
+  "precedence": 1,
+  "notes": ""
+}
