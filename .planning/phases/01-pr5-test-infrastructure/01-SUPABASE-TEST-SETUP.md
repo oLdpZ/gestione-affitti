@@ -1,144 +1,110 @@
-# Supabase test project + GitHub Secrets — setup manuale
+# Supabase test setup + GitHub Secrets — stato consolidato
 
 Phase 1 / PR5 — REQ-PLAY-01.
-Questo documento descrive i passi che **devi eseguire fuori dal repo** (dashboard Supabase + GitHub Settings) per abilitare la suite Playwright in CI. Claude non puo' farli al posto tuo: la creazione del progetto Supabase e l'inserimento dei GitHub Secrets richiedono credenziali interattive su dashboard web.
+
+> **Variance vs piano originale.** Il piano (01-PLAN.md) richiede un progetto Supabase separato. La realta' provisionata e' diversa: **progetto prod condiviso** (`bavkwjxngwzggahdwcjr`) con **trigger DB BEFORE INSERT/UPDATE/DELETE** che limita la `service_role` key al solo `TEST_USER_ID=0c37fe92-c63d-4e80-9d9a-abc4c01c6290`. L'isolamento avviene a livello DB invece che a livello progetto. Threat model T-01-02 mitigato in modo equivalente — il blast radius della service_role e' bloccato dal trigger, non dalla separazione di progetto.
 
 ---
 
-## 1. Perche' un progetto Supabase separato
+## 1. Schema reale (verbatim, NON modificare)
 
-- **No corruzione prod.** I test fanno `DELETE` + `POST` sulla tabella `dati_utente` di un utente di test. Eseguirli sul progetto di produzione cancellerebbe i tuoi dati reali ad ogni run CI.
-- **Isolamento RLS.** La service_role key bypassa Row Level Security: se la usassimo contro prod e accidentalmente entrasse in un workflow `pull_request`, una PR da fork potrebbe leggere/cancellare qualsiasi riga. Avere un progetto separato limita il blast radius.
-- **Cost.** Il free tier copre ampiamente: 1 progetto in piu', uso saltuario, nessun costo.
+```
+Table:  user_data
+Cols:   user_id (uuid, PK, references auth.users(id))
+        data    (jsonb)
+        updated_at (timestamptz)
 
----
-
-## 2. Step di provisioning
-
-### 2.1 Crea il progetto Supabase
-
-1. Vai su https://app.supabase.com -> **New project**
-2. **Name:** `gestione-affitti-test`
-3. **Region:** stessa di prod (per parita' di latenza nei test)
-4. **Password:** scegline una forte e salvala nel password manager (la useremo solo se serve `psql` diretto)
-5. Attendi il provisioning (~2 min)
-
-### 2.2 Recupera URL e service_role key
-
-1. Apri il progetto -> **Settings** -> **API**
-2. Copia il **Project URL** (formato `https://xxx.supabase.co`) — diventera' `SUPABASE_TEST_URL`
-3. Copia la **service_role** key dalla sezione "Project API keys" — diventera' `SUPABASE_SERVICE_KEY`
-
-> **ATTENZIONE:** la `service_role` key **bypassa RLS**. Non incollarla mai in `index.html`, non echo-arla in CI, non committarla in `.env.test`. Vive solo in GitHub Secrets e nella tua shell locale (export temporaneo).
-
-### 2.3 Applica lo schema
-
-Settings -> **SQL Editor** -> New query -> incolla **verbatim**:
-
-```sql
-create table if not exists dati_utente (
-  user_id uuid primary key references auth.users(id),
-  blob_json jsonb,
-  updated_at timestamptz default now()
-);
-alter table dati_utente enable row level security;
-create policy "Users can access own data" on dati_utente
-  for all using (auth.uid() = user_id);
+RLS:    enabled
+Policy: "Users can access own data" — for all using (auth.uid() = user_id)
+Trigger: GUARD BEFORE INSERT/UPDATE/DELETE
+         Solleva eccezione "GUARD: service_role puo modificare SOLO il TEST_USER_ID"
+         se user_id != 0c37fe92-c63d-4e80-9d9a-abc4c01c6290
 ```
 
-Clicca **Run**. Verifica nel Table Editor che `dati_utente` esista con colonne `user_id`, `blob_json`, `updated_at`.
+**ATTENZIONE — naming critico:**
+- Tabella: **`user_data`** (NON `dati_utente`)
+- Colonna jsonb: **`data`** (NON `blob_json`)
 
-### 2.4 Crea l'utente di test
-
-1. **Authentication** -> **Users** -> **Invite user** (oppure "Add user" se preferisci settare la password direttamente)
-2. Email: `test@gestione-affitti.local` (raccomandata — TLD non instradabile, niente spam) — oppure un'email throwaway tua
-3. Password: scegline una stabile e salvala (sara' `TEST_PASSWORD`)
-4. Una volta creato l'utente, clicca sulla riga e **copia il suo UUID** — sara' `TEST_USER_ID`
+Tutti i seed REST e le fixture Playwright devono usare questi nomi.
 
 ---
 
-## 3. GitHub Secrets
+## 2. Stato provisioning
 
-Vai su **GitHub repo -> Settings -> Secrets and variables -> Actions -> New repository secret** e aggiungi i 5 secret seguenti:
+- [x] Progetto Supabase prod `bavkwjxngwzggahdwcjr` gia' attivo (condiviso)
+- [x] Tabella `user_data` con schema + RLS gia' applicata
+- [x] Trigger guard installato e testato (INSERT con user_id != TEST_USER_ID -> eccezione)
+- [x] Utente di test creato, `TEST_USER_ID = 0c37fe92-c63d-4e80-9d9a-abc4c01c6290`
+- [x] 5 GitHub Secrets configurati:
+  - `SUPABASE_TEST_URL` -> `https://bavkwjxngwzggahdwcjr.supabase.co`
+  - `SUPABASE_SERVICE_KEY` -> service_role (guardata dal trigger)
+  - `TEST_EMAIL`
+  - `TEST_PASSWORD`
+  - `TEST_USER_ID = 0c37fe92-c63d-4e80-9d9a-abc4c01c6290`
 
-| Secret | Valore (da dove) |
-|--------|------------------|
-| `SUPABASE_TEST_URL` | Project URL dal punto 2.2 |
-| `SUPABASE_SERVICE_KEY` | service_role key dal punto 2.2 |
-| `TEST_EMAIL` | email dell'utente invitato (es. `test@gestione-affitti.local`) |
-| `TEST_PASSWORD` | password scelta al punto 2.4 |
-| `TEST_USER_ID` | UUID dell'utente dal punto 2.4 |
-
-Non usare `Environment secrets` (Settings -> Environments) — il workflow non e' agganciato a un environment named, quindi quei secret non sarebbero accessibili.
-
----
-
-## 4. GitHub Pages deploy gating
-
-Devi scegliere una delle due strategie in base a come e' configurato il deploy del sito attualmente.
-
-### 4.1 Determina la modalita' di deploy
-
-1. **Settings -> Pages**
-2. Guarda **"Build and deployment" -> Source**:
-   - Se dice **"Deploy from a branch"** -> sei in modalita' **`deploy-from-branch`**
-   - Se dice **"GitHub Actions"** -> sei in modalita' **`github-actions`**
-
-Annota questa scelta: dovrai comunicarla a Claude (`DEPLOY_MODE=...`) per sbloccare Task 9.
-
-### 4.2 Se DEPLOY_MODE=deploy-from-branch
-
-Il deploy parte automaticamente quando `master` cambia. Per bloccarlo se i test falliscono devi usare **branch protection** + **required status check**.
-
-1. **Settings -> Branches -> Branch protection rules -> Add rule**
-2. **Branch name pattern:** `master`
-3. Spunta **"Require status checks to pass before merging"**
-4. Nel campo di ricerca "Status checks that are required" cerca **`Playwright Tests`** e aggiungilo
-
-> Nota: il check `Playwright Tests` compare nel selettore **solo dopo che il workflow e' girato almeno una volta**. Se non lo trovi: pusha prima il commit del Task 9 (con la branch protection rule ancora vuota), aspetta che `Playwright Tests` giri una volta, poi torna qui e aggiungi il required check.
-
-### 4.3 Se DEPLOY_MODE=github-actions
-
-In Task 9 il workflow generato includera' automaticamente un job `deploy` con `needs: test` — niente da configurare a mano oltre ai 5 secret.
+> La `service_role` key e' protetta dal trigger DB ma resta comunque sensibile (puo' leggere altre tabelle, bypassa RLS in lettura). Non va mai in `index.html`, mai in CI log, mai in `.env.test` committato.
 
 ---
 
-## 5. Smoke test (PRIMA di proseguire con Task 4)
+## 3. GitHub Pages deploy gating — `deploy-from-branch`
 
-Da terminale (PowerShell o bash) — sostituisci i placeholder con i valori veri:
+Pages e' configurato come **"Deploy from a branch"** (`master`/root). Il deploy parte automaticamente quando `master` cambia. Il gate "test rosso blocca deploy" si applica via **branch protection + required status check**.
+
+### Stato attuale
+
+- [ ] Branch protection rule su `master` con `Playwright Tests` come required status check **NON ancora configurata**.
+
+### Procedura (DA FARE dopo Task 9, PRIMA del Checkpoint 11)
+
+1. Task 9 genera `.github/workflows/playwright.yml` e fa il primo push su master.
+2. Aspettare che il workflow `Playwright Tests` giri **almeno una volta** (anche se rosso va bene).
+3. Andare in **GitHub repo -> Settings -> Branches -> Branch protection rules -> Add rule** (oppure "Rules" -> "Rulesets" nelle UI piu' recenti).
+4. Branch name pattern: `master`.
+5. Spuntare **"Require status checks to pass before merging"**.
+6. Nel selettore cercare e aggiungere **`Playwright Tests`** (ora visibile perche' il workflow ha girato).
+7. Salvare.
+8. (Opzionale ma raccomandato) spuntare anche "Do not allow bypassing the above settings".
+
+Verifica dopo l'aggiunta (da locale):
 
 ```bash
-export SUPABASE_TEST_URL="https://xxx.supabase.co"
-export SUPABASE_SERVICE_KEY="eyJ..."
+OWNER_REPO=$(git config --get remote.origin.url | sed -E 's#.*github.com[:/]+([^/]+/[^/.]+)(\.git)?#\1#')
+gh api "repos/$OWNER_REPO/branches/master/protection/required_status_checks" --jq '.contexts[]'
+```
 
-curl -s -X GET "$SUPABASE_TEST_URL/rest/v1/dati_utente?limit=1" \
+Deve restituire una riga `Playwright Tests`. Se 404 -> rule non attiva.
+
+---
+
+## 4. Smoke test consigliato
+
+Da terminale, una volta esportate le 5 env vars:
+
+```bash
+curl -s -X GET "$SUPABASE_TEST_URL/rest/v1/user_data?user_id=eq.$TEST_USER_ID&select=user_id" \
   -H "apikey: $SUPABASE_SERVICE_KEY" \
   -H "Authorization: Bearer $SUPABASE_SERVICE_KEY"
 ```
 
-- **Atteso:** `[]` (array vuoto) o una risposta 200 qualsiasi.
-- **401:** service_role key sbagliata o copiata male.
-- **404:** schema non applicato (torna a 2.3).
+Attesi: `[]` (utente non ancora seedato) o `[{"user_id":"0c37fe92-..."}]`. 401 -> key sbagliata. 404 -> URL sbagliato.
+
+Verifica trigger (dovrebbe fallire):
+
+```bash
+curl -s -X POST "$SUPABASE_TEST_URL/rest/v1/user_data" \
+  -H "apikey: $SUPABASE_SERVICE_KEY" \
+  -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"user_id":"00000000-0000-0000-0000-000000000000","data":{}}'
+```
+
+Atteso: errore con messaggio contenente "GUARD: service_role puo modificare SOLO il TEST_USER_ID" -> trigger attivo.
 
 ---
 
-## 6. Verification checklist
+## 5. Checklist finale prima di Checkpoint 11
 
-Spunta tutto prima di scrivere il messaggio di resume a Claude:
-
-- [ ] Progetto Supabase `gestione-affitti-test` creato
-- [ ] Schema `dati_utente` + RLS policy applicati
-- [ ] Utente di test invitato con email/password stabili, UUID annotato
-- [ ] 5 GitHub Secrets aggiunti (`SUPABASE_TEST_URL`, `SUPABASE_SERVICE_KEY`, `TEST_EMAIL`, `TEST_PASSWORD`, `TEST_USER_ID`)
-- [ ] GitHub Pages deploy gating configurato (`deploy-from-branch` con branch protection rule **oppure** `github-actions` mode confermato)
-- [ ] Smoke test `curl` ha restituito 200 (non 401, non 404)
-
-Messaggio di resume a Claude:
-
-```
-approved DEPLOY_MODE=github-actions
-```
-oppure
-```
-approved DEPLOY_MODE=deploy-from-branch
-```
+- [x] Schema reale documentato (`user_data` + colonna `data`)
+- [x] 5 GitHub Secrets configurati
+- [x] Trigger guard attivo (testato)
+- [ ] Branch protection rule `Playwright Tests` aggiunta DOPO il primo run del workflow (Task 9)

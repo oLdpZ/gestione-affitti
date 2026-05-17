@@ -38,7 +38,7 @@ user_setup:
     dashboard_config:
       - task: "Create new Supabase free-tier project named gestione-affitti-test"
         location: "https://app.supabase.com -> New project"
-      - task: "Run schema SQL to create dati_utente table + RLS policy (SQL provided in 01-SUPABASE-TEST-SETUP.md)"
+      - task: "Run schema SQL to create user_data table + RLS policy (SQL provided in 01-SUPABASE-TEST-SETUP.md)"
         location: "Supabase Dashboard -> SQL Editor"
       - task: "Create test user with stable email/password"
         location: "Supabase Dashboard -> Authentication -> Users -> Invite user"
@@ -106,7 +106,7 @@ must_haves:
       via: "webServer: { command: 'npx serve . -l 3000 --no-clipboard' }"
       pattern: "webServer"
     - from: "tests/fixtures.ts"
-      to: "Supabase test project /rest/v1/dati_utente"
+      to: "Supabase test project /rest/v1/user_data"
       via: "fetch with SUPABASE_SERVICE_KEY from env"
       pattern: "SUPABASE_SERVICE_KEY"
     - from: "tests/*.spec.ts"
@@ -170,13 +170,13 @@ Save (importo=0):
 
 Supabase test project schema (Phase 1 only — pre-PR2b):
 ```sql
-create table if not exists dati_utente (
+create table if not exists user_data (
   user_id uuid primary key references auth.users(id),
-  blob_json jsonb,
+  data jsonb,
   updated_at timestamptz default now()
 );
-alter table dati_utente enable row level security;
-create policy "Users can access own data" on dati_utente
+alter table user_data enable row level security;
+create policy "Users can access own data" on user_data
   for all using (auth.uid() = user_id);
 ```
 
@@ -195,8 +195,8 @@ Mock blob shape (from RESEARCH.md fixtures):
 ```
 
 Supabase REST seed (service_role bypasses RLS):
-- DELETE `${SUPABASE_TEST_URL}/rest/v1/dati_utente?user_id=eq.${TEST_USER_ID}`
-- POST `${SUPABASE_TEST_URL}/rest/v1/dati_utente` body `{ user_id, blob_json }`
+- DELETE `${SUPABASE_TEST_URL}/rest/v1/user_data?user_id=eq.${TEST_USER_ID}`
+- POST `${SUPABASE_TEST_URL}/rest/v1/user_data` body `{ user_id, data }`
 - Headers: `apikey: SERVICE_KEY`, `Authorization: Bearer SERVICE_KEY`, `Content-Type: application/json`
 </interfaces>
 </context>
@@ -294,13 +294,13 @@ Create `01-SUPABASE-TEST-SETUP.md` in the phase dir documenting the manual steps
    - Open Settings -> API; copy `Project URL` and `service_role` key (the latter is GH-Secret-only — never paste into index.html, never log)
    - In SQL Editor run (verbatim):
      ```sql
-     create table if not exists dati_utente (
+     create table if not exists user_data (
        user_id uuid primary key references auth.users(id),
-       blob_json jsonb,
+       data jsonb,
        updated_at timestamptz default now()
      );
-     alter table dati_utente enable row level security;
-     create policy "Users can access own data" on dati_utente
+     alter table user_data enable row level security;
+     create policy "Users can access own data" on user_data
        for all using (auth.uid() = user_id);
      ```
    - Authentication -> Users -> Invite a test user with a stable email (e.g., `test@gestione-affitti.local`) and stable password. Note the user's UUID.
@@ -323,7 +323,7 @@ Commit: `docs(pr5): document Supabase test project + GH Secrets manual setup`
 Then create a CHECKPOINT in the same task action: stop and surface this doc to the user as part of `<checkpoint:human-action>` (defined explicitly as Task 3b below — split for clarity).
   </action>
   <verify>
-    <automated>test -f .planning/phases/01-pr5-test-infrastructure/01-SUPABASE-TEST-SETUP.md && grep -q "SUPABASE_SERVICE_KEY" .planning/phases/01-pr5-test-infrastructure/01-SUPABASE-TEST-SETUP.md && grep -q "create table if not exists dati_utente" .planning/phases/01-pr5-test-infrastructure/01-SUPABASE-TEST-SETUP.md && grep -q "TEST_USER_ID" .planning/phases/01-pr5-test-infrastructure/01-SUPABASE-TEST-SETUP.md && echo OK</automated>
+    <automated>test -f .planning/phases/01-pr5-test-infrastructure/01-SUPABASE-TEST-SETUP.md && grep -q "SUPABASE_SERVICE_KEY" .planning/phases/01-pr5-test-infrastructure/01-SUPABASE-TEST-SETUP.md && grep -q "create table if not exists user_data" .planning/phases/01-pr5-test-infrastructure/01-SUPABASE-TEST-SETUP.md && grep -q "TEST_USER_ID" .planning/phases/01-pr5-test-infrastructure/01-SUPABASE-TEST-SETUP.md && echo OK</automated>
   </verify>
   <done>
 Doc exists at the phase dir, all 5 secrets named, SQL block included verbatim, deploy gating both branches documented, manual verification checklist present.
@@ -337,13 +337,13 @@ Doc exists at the phase dir, all 5 secrets named, SQL block included verbatim, d
 1. Open `.planning/phases/01-pr5-test-infrastructure/01-SUPABASE-TEST-SETUP.md` and follow the steps end-to-end.
 2. Confirm all 5 boxes in the verification checklist at the bottom are checked:
    - [ ] gestione-affitti-test Supabase project created
-   - [ ] dati_utente schema + RLS policy applied
+   - [ ] user_data schema + RLS policy applied
    - [ ] Test user invited with stable email/password (UUID noted)
    - [ ] 5 GitHub Secrets added (SUPABASE_TEST_URL, SUPABASE_SERVICE_KEY, TEST_EMAIL, TEST_PASSWORD, TEST_USER_ID)
    - [ ] GitHub Pages deploy gating configured per the doc (branch protection OR `needs: test` strategy noted)
 3. As a smoke test from your terminal (replace placeholders with the just-created values; this proves the service_role key works against the new project):
    ```bash
-   curl -s -X GET "$SUPABASE_TEST_URL/rest/v1/dati_utente?limit=1" \
+   curl -s -X GET "$SUPABASE_TEST_URL/rest/v1/user_data?limit=1" \
      -H "apikey: $SUPABASE_SERVICE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_KEY"
    ```
    Expected: `[]` (or any 200 response, not 401/404). If 401: service_role key wrong. If 404: schema not applied.
@@ -362,7 +362,7 @@ Create `tests/fixtures.ts` matching RESEARCH.md Pattern 2 exactly. Specifically 
 2. Export two `MOCK_DATI` constants:
    - `MOCK_DATI` — 2 proprieta (`prop-test-001` importo=900, `prop-zero-001` importo=0 — covers REGRESSION-01), 1 banca, empty `incassiAffitti` and `utenze`. Use the exact shape from RESEARCH Pattern 2 §MOCK_DATI.
    - `MOCK_DATI_WITH_ORPHAN` — spreads MOCK_DATI plus one `incassiAffitti` entry with `proprietaId: 'prop-deleted-999'` (does not exist in proprieta array), `mese: new Date().toISOString().slice(0,7)`, `importo: 500`, all other fields valid (covers REGRESSION-05).
-3. Implement `seedSupabase(blob: object)` exactly per RESEARCH: DELETE `${SUPABASE_URL}/rest/v1/dati_utente?user_id=eq.${TEST_USER_ID}` then POST `${SUPABASE_URL}/rest/v1/dati_utente` body `{ user_id: TEST_USER_ID, blob_json: blob }`. Both requests use service_role key in `apikey` + `Authorization: Bearer` headers + `Content-Type: application/json` + POST adds `Prefer: return=minimal`. Check response.ok and throw with body on failure.
+3. Implement `seedSupabase(blob: object)` exactly per RESEARCH: DELETE `${SUPABASE_URL}/rest/v1/user_data?user_id=eq.${TEST_USER_ID}` then POST `${SUPABASE_URL}/rest/v1/user_data` body `{ user_id: TEST_USER_ID, data: blob }`. Both requests use service_role key in `apikey` + `Authorization: Bearer` headers + `Content-Type: application/json` + POST adds `Prefer: return=minimal`. Check response.ok and throw with body on failure.
 4. Export Playwright `test` extended with two fixtures: `seedData` (calls seedSupabase(MOCK_DATI)) and `seedWithOrphan` (calls seedSupabase(MOCK_DATI_WITH_ORPHAN)). Both `{ auto: false }` so specs opt in by adding them to args.
 5. Export `doLogin(page)` helper: `page.goto('/')`, `waitForSelector('input[type="email"]')`, fill email + password, click `button[type="submit"]`, `waitForSelector('text=Dashboard', { timeout: 15_000 })`. Counter to RESEARCH Pitfall 1 (Alpine defer race).
 6. Re-export `expect` from `@playwright/test`.
@@ -859,7 +859,7 @@ This phase succeeds when all four ROADMAP Phase 1 success criteria are demonstra
 
 **SC-4: Dedicated test user with mock data exists in a Supabase test project and is used by CI**
 - Manual: checkpoint 3b verifies test project + test user provisioned + 5 GH Secrets set
-- Code: `tests/fixtures.ts` reads all 5 env vars + seeds `dati_utente.blob_json` for TEST_USER_ID via service_role
+- Code: `tests/fixtures.ts` reads all 5 env vars + seeds `user_data.data` for TEST_USER_ID via service_role
 - CI: `.github/workflows/playwright.yml` injects all 5 secrets into the test job env
 - End-to-end: checkpoint 11 step A confirms the green local run, which only works if the seed succeeded
 
@@ -882,7 +882,7 @@ Additional invariants:
 - [ ] `SUPABASE_SERVICE_KEY` appears in zero locations other than: GH Secrets, `tests/fixtures.ts` (env read only), `.github/workflows/playwright.yml` (env injection only). Grep gate: `grep -rn "service_role\\|SERVICE_KEY" --exclude-dir=node_modules --exclude-dir=.git . | grep -v "^Binary"` returns only the three expected files + the setup doc.
 - [ ] README "Test suite" section exists and documents local run + CI gating contract in Italian (CON-004)
 - [ ] All 5 GH Secrets configured (verified via checkpoint 3b smoke test)
-- [ ] Supabase test project provisioned with `dati_utente` table + RLS policy + test user (verified via checkpoint 3b)
+- [ ] Supabase test project provisioned with `user_data` table + RLS policy + test user (verified via checkpoint 3b)
 </success_criteria>
 
 <output>
