@@ -1,0 +1,50 @@
+name: Playwright Tests
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+      - name: Run Playwright tests
+        env:
+          BASE_URL: 'http://localhost:3000'
+          SUPABASE_TEST_URL: ${{ secrets.SUPABASE_TEST_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          TEST_EMAIL: ${{ secrets.TEST_EMAIL }}
+          TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
+          TEST_USER_ID: ${{ secrets.TEST_USER_ID }}
+        run: npx playwright test
+      - name: Upload test artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ github.run_id }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
+# Deploy gating: this repo uses "Deploy from a branch" for GitHub Pages.
+# Il deploy NON e' gestito in questo workflow — Pages pubblica direttamente
+# il contenuto di master. Il gate "test rosso blocca deploy" si applica
+# tramite branch protection rule + required status check "Playwright Tests"
+# su master. Setup procedura in
+# .planning/phases/01-pr5-test-infrastructure/01-SUPABASE-TEST-SETUP.md §3.
+#
+# La rule va aggiunta DOPO il primo run di questo workflow (il check
+# 'Playwright Tests' compare nel selettore solo a quel punto). PRIMA del
+# Checkpoint 11.
