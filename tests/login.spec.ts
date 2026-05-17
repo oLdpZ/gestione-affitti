@@ -24,21 +24,22 @@ test.describe('login', () => {
 
   test('REGRESSION-04: importo=0 al salvataggio mostra confirm soft (CON-017 #4)', async ({ page, seedData }) => {
     await doLogin(page);
-
     await page.click('button:has-text("Impostazioni")');
 
-    // Riga proprieta -> bottone Modifica (apre form proprieta in cima alla sezione).
-    await page
+    // Scope alla sezione Proprieta: div.mb-8 contenente h3 "Proprieta".
+    const propSection = page
+      .locator('div.mb-8')
+      .filter({ has: page.locator('h3', { hasText: /^Proprieta$/ }) });
+
+    // Riga proprieta -> bottone Modifica (apre form sopra la tabella).
+    await propSection
       .locator('tr')
       .filter({ hasText: 'Appartamento Test Via Roma' })
       .locator('button:has-text("Modifica")')
       .click();
 
-    // Scope al form della proprieta (unico panel con label 'Importo mensile').
-    const propForm = page
-      .locator('div.bg-white, div.dark\\:bg-gray-800')
-      .filter({ hasText: 'Importo mensile' })
-      .first();
+    // Form panel: l'attributo Alpine [x-show="mostraFormProprieta"] e' univoco.
+    const propForm = propSection.locator('[x-show="mostraFormProprieta"]');
     await expect(propForm).toBeVisible();
 
     // Pitfall 2: register dialog handler PRIMA di Salva.

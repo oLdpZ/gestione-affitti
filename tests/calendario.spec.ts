@@ -82,25 +82,20 @@ test.describe('calendario', () => {
     await doLogin(page);
     await page.click('button:has-text("Impostazioni")');
 
-    // index.html:663-666: il bottone "+ Nuova" della sezione Proprieta vive
-    // nel flex header sibling dell'h3 "Proprieta". Lo scope cerca il
-    // contenitore mb-8 che ha l'h3 "Proprieta" e poi clicca il + Nuova.
+    // Scope alla sezione Proprieta (stesso pattern di REGRESSION-04).
     const propSection = page
       .locator('div.mb-8')
       .filter({ has: page.locator('h3', { hasText: /^Proprieta$/ }) });
     await propSection.locator('button:has-text("+ Nuova")').click();
 
-    // Scope al form proprieta (unica section con label 'Importo mensile').
-    const propForm = page
-      .locator('div')
-      .filter({ has: page.locator('label:has-text("Importo mensile")') })
-      .first();
+    // Form panel: attributo Alpine univoco.
+    const propForm = propSection.locator('[x-show="mostraFormProprieta"]');
     await expect(propForm).toBeVisible();
 
+    // Nome: x-model="editProprieta.nome" — unico input[type="text"] nel form
+    // proprieta che binda editProprieta.nome.
     await propForm
-      .locator('label:has-text("Nome")')
-      .locator('..')
-      .locator('input[type="text"]')
+      .locator('input[x-model="editProprieta.nome"]')
       .fill('Proprieta E2E Test');
     await propForm.locator('input[type="number"]').fill('1200');
 
