@@ -27,7 +27,8 @@ This ordering is locked by ADR-ceo-plan.md and cannot be reordered without a sup
   2. All 5 LOCKED regression tests (CON-017) run on every push and pass against current master
   3. Suite covers the 5 critical paths: login, crea proprietà, segna incasso, elimina + ripristina cestino, offline write + sync
   4. Dedicated test user with mock data exists in a Supabase test project and is used by CI
-**Plans**: TBD
+**Plans**: 1 plan
+- [ ] 01-01-PLAN.md — Playwright + Supabase test project + CI gate (5 LOCKED regressions LIVE, 2 critical paths scaffolded as test.skip)
 
 ### Phase 2: PR0 — Apple/Sonoma redesign + responsive
 **Goal**: Full UI redesign per design handoff `sbPqzZsV396NsMp4jSK5eQ` so all subsequent PR build on the new skin (no rework).
@@ -111,7 +112,7 @@ This ordering is locked by ADR-ceo-plan.md and cannot be reordered without a sup
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. PR5 Test infrastructure | 0/0 | Active | - |
+| 1. PR5 Test infrastructure | 0/1 | Active | - |
 | 2. PR0 Redesign | 0/0 | Not started | - |
 | 3. PR1 Data safety + bugfix + app.js | 0/0 | Not started | - |
 | 4. PR2a PWA shell | 0/0 | Not started | - |
