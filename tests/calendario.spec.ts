@@ -101,9 +101,12 @@ test.describe('calendario', () => {
 
     await propForm.locator('button:has-text("Salva")').click();
 
-    await expect(page.locator('text=Proprieta E2E Test').first()).toBeVisible({
-      timeout: 5_000,
-    });
+    // Dopo il Salva la nuova proprieta compare nella tabella dentro propSection
+    // (in td x-text="p.nome"). L'h3 con lo stesso testo sta sulla dashboard
+    // che e' nascosta — scoping a propSection evita il false-match nascosto.
+    await expect(
+      propSection.locator('td').filter({ hasText: 'Proprieta E2E Test' }),
+    ).toBeVisible({ timeout: 5_000 });
     await expect(
       page.locator('.status-dot.bg-green-500, .status-dot[class*="green-500"]').first(),
     ).toBeVisible({ timeout: 10_000 });
