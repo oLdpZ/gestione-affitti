@@ -11,9 +11,8 @@ test.describe('calendario', () => {
     const card = page
       .locator('.bg-yellow-50, [class*="yellow-900"]')
       .filter({ hasText: 'Appartamento Importo Zero' });
-    await expect(card).toBeVisible();
-    await expect(card.locator('button:has-text("Sistema")')).toBeVisible();
-    await expect(card.locator('text=Importo mensile')).toBeVisible();
+    await expect(card.first()).toBeVisible();
+    await expect(card.first().locator('button:has-text("Sistema")')).toBeVisible();
   });
 
   test('REGRESSION-02: genera incassi mancanti elenca le saltate (CON-017 #2)', async ({ page, seedData }) => {
@@ -37,12 +36,16 @@ test.describe('calendario', () => {
     await doLogin(page);
     await page.click('button:has-text("Calendario")');
 
-    const orfaniGroup = page.locator('h3').filter({ hasText: 'orfani' });
-    await expect(orfaniGroup).toBeVisible();
+    // index.html:1295 — label gruppo: '⚠ Incassi orfani (proprieta cancellata)'
+    // L'h3 e' il selettore di intestazione del gruppo (vedi index.html:311).
+    const orfaniHeader = page
+      .locator('h3')
+      .filter({ hasText: /[Ii]ncassi orfani/ });
+    await expect(orfaniHeader).toBeVisible({ timeout: 10_000 });
 
-    // L'importo 500 deve apparire nel blocco orfani — risaliamo al container piu' vicino.
-    const orfaniContainer = orfaniGroup.locator('..').locator('..');
-    await expect(orfaniContainer.locator('text=500')).toBeVisible();
+    // L'importo 500 deve apparire dentro il blocco del gruppo orfani.
+    const orfaniBlock = orfaniHeader.locator('..');
+    await expect(orfaniBlock.locator('text=500').first()).toBeVisible();
   });
 
   test('CRITICAL-02: segna incasso oggi in <2s', async ({ page, seedData }) => {
@@ -50,28 +53,28 @@ test.describe('calendario', () => {
     await page.click('button:has-text("Calendario")');
 
     // Pitfall 4: generaIncassiAttesi puo' aver gia' creato l'incasso a init.
-    // La card iniziale puo' essere grigia (atteso) o rossa (scaduto); cerchiamo
-    // quella della proprieta target.
     const card = page
       .locator('.bg-gray-50, .bg-red-50')
       .filter({ hasText: 'Appartamento Test Via Roma' });
-    await expect(card).toBeVisible();
+    await expect(card.first()).toBeVisible();
 
     const start = Date.now();
     await card
+      .first()
       .locator('button')
       .filter({ hasText: /Incassa oggi|^Oggi$/ })
       .first()
       .click();
 
     await expect(
-      page.locator('.bg-green-50').filter({ hasText: 'Appartamento Test Via Roma' }),
+      page.locator('.bg-green-50').filter({ hasText: 'Appartamento Test Via Roma' }).first(),
     ).toBeVisible({ timeout: 5_000 });
 
     expect(Date.now() - start).toBeLessThan(2_000);
 
+    // Status dot esiste 2x (desktop + sm:hidden mobile) — first() per evitare strict mode.
     await expect(
-      page.locator('.status-dot[class*="green"], .status-dot.bg-green-500'),
+      page.locator('.status-dot.bg-green-500, .status-dot[class*="green-500"]').first(),
     ).toBeVisible({ timeout: 10_000 });
   });
 
@@ -79,22 +82,35 @@ test.describe('calendario', () => {
     await doLogin(page);
     await page.click('button:has-text("Impostazioni")');
 
-    // Scoping alla sezione Proprieta — niente bare "+" fallback (rischio click sbagliato).
-    await page
-      .locator('section:has-text("Proprietà"), div:has-text("Proprietà")')
-      .locator('button')
-      .filter({ hasText: /Aggiungi|Nuova proprietà/ })
-      .first()
-      .click();
+    // index.html:663-666: il bottone "+ Nuova" della sezione Proprieta vive
+    // nel flex header sibling dell'h3 "Proprieta". Lo scope cerca il
+    // contenitore mb-8 che ha l'h3 "Proprieta" e poi clicca il + Nuova.
+    const propSection = page
+      .locator('div.mb-8')
+      .filter({ has: page.locator('h3', { hasText: /^Proprieta$/ }) });
+    await propSection.locator('button:has-text("+ Nuova")').click();
 
-    await page.locator('input[type="text"]').first().fill('Proprietà E2E Test');
-    await page.locator('input[type="number"]').first().fill('1200');
+    // Scope al form proprieta (unica section con label 'Importo mensile').
+    const propForm = page
+      .locator('div')
+      .filter({ has: page.locator('label:has-text("Importo mensile")') })
+      .first();
+    await expect(propForm).toBeVisible();
 
-    await page.click('button:has-text("Salva")');
+    await propForm
+      .locator('label:has-text("Nome")')
+      .locator('..')
+      .locator('input[type="text"]')
+      .fill('Proprieta E2E Test');
+    await propForm.locator('input[type="number"]').fill('1200');
 
-    await expect(page.locator('text=Proprietà E2E Test')).toBeVisible({ timeout: 5_000 });
+    await propForm.locator('button:has-text("Salva")').click();
+
+    await expect(page.locator('text=Proprieta E2E Test').first()).toBeVisible({
+      timeout: 5_000,
+    });
     await expect(
-      page.locator('.status-dot[class*="green"], .status-dot.bg-green-500'),
+      page.locator('.status-dot.bg-green-500, .status-dot[class*="green-500"]').first(),
     ).toBeVisible({ timeout: 10_000 });
   });
 });

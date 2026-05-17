@@ -13,9 +13,13 @@ test.describe('login', () => {
     await page.fill('input[type="password"]', process.env.TEST_PASSWORD!);
     await page.click('button[type="submit"]');
 
-    await expect(page.locator('text=Dashboard')).toBeVisible({ timeout: 15_000 });
-    await expect(page.locator('.status-dot')).toBeVisible();
-    await expect(page.locator('text=Appartamento Test Via Roma')).toBeVisible();
+    // 'Dashboard' compare in 3 punti (2 button nav + 1 h2). Heading per evitare strict.
+    await expect(page.getByRole('heading', { name: /Dashboard/ })).toBeVisible({
+      timeout: 15_000,
+    });
+    // Status dot esiste due volte (desktop + sm:hidden mobile). first() per non strict.
+    await expect(page.locator('.status-dot').first()).toBeVisible();
+    await expect(page.locator('text=Appartamento Test Via Roma').first()).toBeVisible();
   });
 
   test('REGRESSION-04: importo=0 al salvataggio mostra confirm soft (CON-017 #4)', async ({ page, seedData }) => {
@@ -23,24 +27,29 @@ test.describe('login', () => {
 
     await page.click('button:has-text("Impostazioni")');
 
-    // Apri il form di modifica della prop-test-001
+    // Riga proprieta -> bottone Modifica (apre form proprieta in cima alla sezione).
     await page
-      .locator('tr,div')
+      .locator('tr')
       .filter({ hasText: 'Appartamento Test Via Roma' })
-      .locator('button')
-      .filter({ hasText: /[Mm]odifica/ })
-      .first()
+      .locator('button:has-text("Modifica")')
       .click();
 
-    // Imposta importo a 0 — Pitfall 2: register dialog handler PRIMA del click su Salva
+    // Scope al form della proprieta (unico panel con label 'Importo mensile').
+    const propForm = page
+      .locator('div.bg-white, div.dark\\:bg-gray-800')
+      .filter({ hasText: 'Importo mensile' })
+      .first();
+    await expect(propForm).toBeVisible();
+
+    // Pitfall 2: register dialog handler PRIMA di Salva.
     let confirmShown = false;
     page.on('dialog', async (d) => {
       confirmShown = true;
       await d.dismiss();
     });
 
-    await page.locator('input[type="number"]').first().fill('0');
-    await page.click('button:has-text("Salva")');
+    await propForm.locator('input[type="number"]').fill('0');
+    await propForm.locator('button:has-text("Salva")').click();
 
     await expect.poll(() => confirmShown, { timeout: 5_000 }).toBe(true);
   });

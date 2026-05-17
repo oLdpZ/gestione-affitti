@@ -86,24 +86,23 @@ const seedHeaders = {
 };
 
 export async function seedSupabase(blob: object): Promise<void> {
-  // DELETE prima per ripartire pulito (trigger DB blocca altri user_id).
-  const delRes = await fetch(
-    `${SUPABASE_URL}/rest/v1/user_data?user_id=eq.${TEST_USER_ID}`,
-    { method: 'DELETE', headers: seedHeaders },
-  );
-  if (!delRes.ok) {
-    const body = await delRes.text();
-    throw new Error(`Supabase seed DELETE failed ${delRes.status}: ${body}`);
-  }
-
-  const postRes = await fetch(`${SUPABASE_URL}/rest/v1/user_data`, {
+  // UPSERT via PostgREST: INSERT ... ON CONFLICT (user_id) DO UPDATE SET data = excluded.data.
+  // Sostituisce DELETE+POST (la DELETE in alcune combinazioni RLS/trigger non
+  // ripuliva la riga in tempo, causando 409 al POST successivo). L'UPSERT sul
+  // PK user_id e' atomico e idempotente — il blob 'data' viene sostituito
+  // integralmente perche' merge-duplicates opera a livello colonna, non a
+  // livello key JSONB.
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/user_data`, {
     method: 'POST',
-    headers: { ...seedHeaders, Prefer: 'return=minimal' },
+    headers: {
+      ...seedHeaders,
+      Prefer: 'resolution=merge-duplicates,return=minimal',
+    },
     body: JSON.stringify({ user_id: TEST_USER_ID, data: blob }),
   });
-  if (!postRes.ok) {
-    const body = await postRes.text();
-    throw new Error(`Supabase seed POST failed ${postRes.status}: ${body}`);
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Supabase seed UPSERT failed ${res.status}: ${body}`);
   }
 }
 
@@ -113,7 +112,9 @@ export async function doLogin(page: import('@playwright/test').Page): Promise<vo
   await page.fill('input[type="email"]', TEST_EMAIL);
   await page.fill('input[type="password"]', TEST_PASSWORD);
   await page.click('button[type="submit"]');
-  await page.waitForSelector('text=Dashboard', { timeout: 15_000 });
+  // Heading h2 "Dashboard — <mese>" e' unico (i 2 button nav contengono pure
+  // 'Dashboard' ma sono <button>, qui filtriamo per ruolo heading).
+  await page.getByRole('heading', { name: /Dashboard/ }).waitFor({ timeout: 15_000 });
 }
 
 type Fixtures = {
