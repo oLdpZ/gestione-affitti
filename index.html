@@ -329,7 +329,17 @@
                   </div>
                 </div>
               </template>
-              <template x-if="gruppo.incassi.length === 0">
+              <template x-for="prop in gruppo.mancanti" :key="'mancante-'+prop.id">
+                <div class="flex items-center justify-between p-2 rounded-md gap-2 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-300 dark:border-yellow-700">
+                  <div class="flex-1 min-w-0">
+                    <div class="text-sm font-medium truncate" x-text="prop.nome"></div>
+                    <div class="text-xs text-yellow-700 dark:text-yellow-400">&#9888; Importo mensile = <span x-text="prop.importoAffittoMensile || 0"></span> &mdash; nessun incasso generato</div>
+                  </div>
+                  <button type="button" @click="modificaProprieta(prop); vistaCorrente='impostazioni'"
+                          class="px-2.5 py-1 text-xs bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg font-medium shadow-sm transition active:scale-95 whitespace-nowrap">Sistema</button>
+                </div>
+              </template>
+              <template x-if="gruppo.incassi.length === 0 && gruppo.mancanti.length === 0">
                 <p class="text-xs text-gray-400 italic">Nessun incasso</p>
               </template>
             </div>
@@ -894,6 +904,14 @@ function app() {
     mostraFormBanca: false, editBanca: {},
 
     async init() {
+      // Pulizia: rimuove chiave localStorage obsoleta e service worker stale da versioni precedenti
+      try { localStorage.removeItem('gestione_affitti_dati'); } catch (e) {}
+      if ('serviceWorker' in navigator) {
+        try {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          for (const r of regs) await r.unregister();
+        } catch (e) {}
+      }
       // Verifica se esiste una sessione attiva
       const { data: { session } } = await sb.auth.getSession();
       if (session) {
@@ -1258,15 +1276,24 @@ function app() {
     gruppiCalendario() {
       const mese = this.annoCalendario + '-' + String(this.meseCalendario + 1).padStart(2, '0');
       const incM = this.dati.incassiAffitti.filter(i => i.mese === mese);
-      const g1 = [], g15 = [], gfine = [];
+      const g1 = { label: 'Giorno 1', incassi: [], mancanti: [] };
+      const g15 = { label: 'Giorno 15', incassi: [], mancanti: [] };
+      const gfine = { label: 'Fine mese', incassi: [], mancanti: [] };
+      const bucket = (s) => s === '1' ? g1 : (s === '15' ? g15 : gfine);
+      const orfani = [];
       for (const inc of incM) {
         const prop = this.dati.proprieta.find(p => p.id === inc.proprietaId);
-        if (!prop) continue;
-        if (prop.scadenzaAffitto === '1') g1.push(inc);
-        else if (prop.scadenzaAffitto === '15') g15.push(inc);
-        else gfine.push(inc);
+        if (!prop) { orfani.push(inc); continue; }
+        bucket(prop.scadenzaAffitto).incassi.push(inc);
       }
-      return [{ label: 'Giorno 1', incassi: g1 }, { label: 'Giorno 15', incassi: g15 }, { label: 'Fine mese', incassi: gfine }];
+      // Proprietà esistenti senza incasso per il mese (di solito perché importo mensile = 0)
+      for (const prop of this.dati.proprieta) {
+        const ha = incM.some(i => i.proprietaId === prop.id);
+        if (!ha) bucket(prop.scadenzaAffitto).mancanti.push(prop);
+      }
+      const gruppi = [g1, g15, gfine];
+      if (orfani.length > 0) gruppi.push({ label: '⚠ Incassi orfani (proprieta cancellata)', incassi: orfani, mancanti: [] });
+      return gruppi;
     },
     segnaIncassatoOggi(inc) { inc.dataIncasso = oggi(); this.salva(); },
 
@@ -1281,9 +1308,11 @@ function app() {
     generaIncassiMeseVisualizzato() {
       const mese = this.annoCalendario + '-' + String(this.meseCalendario + 1).padStart(2, '0');
       let creati = 0;
+      const saltate = [];
       for (const prop of this.dati.proprieta) {
         const esiste = this.dati.incassiAffitti.some(i => i.proprietaId === prop.id && i.mese === mese);
-        if (esiste || !(prop.importoAffittoMensile > 0)) continue;
+        if (esiste) continue;
+        if (!(prop.importoAffittoMensile > 0)) { saltate.push(prop.nome); continue; }
         this.dati.incassiAffitti.push({
           id: uid(), proprietaId: prop.id, mese,
           dataPrevista: dataPrevist(mese, prop.scadenzaAffitto),
@@ -1294,8 +1323,13 @@ function app() {
         });
         creati++;
       }
-      if (creati === 0) alert('Nessun incasso da creare: sono tutti già presenti per ' + mese + '.');
-      else this.salva();
+      let msg = '';
+      if (creati > 0) { msg += 'Creati ' + creati + ' incassi per ' + mese + '.'; this.salva(); }
+      if (saltate.length > 0) {
+        msg += (msg ? '\n\n' : '') + '⚠ ' + saltate.length + ' proprieta saltate (importo mensile = 0):\n• ' + saltate.join('\n• ') + '\n\nImposta un importo > 0 per generare gli incassi.';
+      }
+      if (!msg) msg = 'Nessuna proprieta da generare: tutto gia presente per ' + mese + '.';
+      alert(msg);
     },
 
     // Modifica incasso esistente tramite modal
@@ -1422,6 +1456,11 @@ function app() {
     modificaProprieta(p) { this.editProprieta = { ...p }; this.mostraFormProprieta = true; },
     salvaProprieta() {
       if (!this.editProprieta.nome) return alert('Inserire il nome');
+      // Warning soft se importo mensile = 0 (non genererebbe incassi e sparisce dal calendario)
+      if (!(this.editProprieta.importoAffittoMensile > 0)) {
+        const ok = confirm('Attenzione: importo mensile = ' + (this.editProprieta.importoAffittoMensile || 0) + '.\n\nLa proprieta NON apparira come incasso sul calendario finche l\'importo non sara > 0.\n\nSalvare comunque?');
+        if (!ok) return;
+      }
       // Warning soft se banca incasso/destinazione hanno valuta diversa dalla proprieta
       const valutaProp = this.editProprieta.currency || 'EUR';
       const bancaIncasso = this.dati.banche.find(b => b.id === this.editProprieta.bancaIncasso);
