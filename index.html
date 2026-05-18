@@ -120,31 +120,125 @@
     @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
     .table-dense th, .table-dense td { padding: 0.35rem 0.5rem; font-size: 0.8rem; }
 
-    /* Sfondo video fullscreen */
-    .usa-flag-bg { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
-    .usa-flag-bg video {
-      position: absolute;
-      top: 50%; left: 50%;
-      min-width: 100%; min-height: 100%;
-      width: auto; height: auto;
-      transform: translate(-50%, -50%);
-      object-fit: cover;
-      opacity: 0.35;
+    /* Reset base */
+    html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: var(--bg-base); }
+    #root { position: relative; z-index: var(--z-content); height: 100vh; height: 100dvh; }
+
+    /* Mesh USA astratta — 6 orbs */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: -15%;
+      background:
+        radial-gradient(closest-side at 12% 18%, #1e3a8a 0%, rgba(30,58,138,0.55) 40%, transparent 75%),
+        radial-gradient(closest-side at 28% 70%, #3b6ad6 0%, rgba(59,106,214,0.4) 40%, transparent 75%),
+        radial-gradient(closest-side at 88% 35%, #d62828 0%, rgba(214,40,40,0.55) 40%, transparent 75%),
+        radial-gradient(closest-side at 75% 95%, #c92626 0%, rgba(201,38,38,0.45) 40%, transparent 75%),
+        radial-gradient(closest-side at 50% 8%, #fdf6e8 0%, rgba(253,246,232,0.6) 50%, transparent 80%),
+        radial-gradient(closest-side at 55% 55%, #fce8dc 0%, rgba(252,232,220,0.5) 50%, transparent 80%);
+      filter: blur(45px) saturate(125%);
+      opacity: 0.9;
+      pointer-events: none;
+      z-index: var(--z-base);
     }
-    @media (prefers-color-scheme: dark) {
-      .usa-flag-bg video { opacity: 0.28; }
+    /* Grain noise */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: var(--z-base);
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.6 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      opacity: 0.30;
+      mix-blend-mode: overlay;
     }
-    .usa-flag-bg::after {
-      content: ''; position: absolute; inset: 0;
-      background: linear-gradient(180deg, rgba(249,250,251,0.70) 0%, rgba(249,250,251,0.82) 100%);
-      backdrop-filter: blur(1.5px);
+
+    /* Typography base */
+    html, body {
+      font-family: var(--font-text);
+      font-size: 14px;
+      line-height: 1.45;
+      letter-spacing: -0.005em;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
+      font-feature-settings: 'cv11', 'ss01', 'ss03';
+      color: var(--text-primary);
     }
-    @media (prefers-color-scheme: dark) {
-      .usa-flag-bg::after {
-        background: linear-gradient(180deg, rgba(17,24,39,0.78) 0%, rgba(17,24,39,0.88) 100%);
+    h1, h2, h3, h4, h5 {
+      font-family: var(--font-display);
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      margin: 0;
+    }
+    .tnum { font-variant-numeric: tabular-nums; font-family: var(--font-mono); }
+    .section-eyebrow { font-size: 13px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-secondary); }
+
+    /* Glass surfaces */
+    .glass-surface, .glass-card {
+      background: var(--surface);
+      backdrop-filter: var(--blur-card);
+      -webkit-backdrop-filter: var(--blur-card);
+      border: 0.5px solid rgba(255,255,255,0.7);
+      border-radius: var(--r-md);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.7), var(--shadow-md);
+    }
+    .glass-shell {
+      background: rgba(255,255,255,0.35);
+      backdrop-filter: var(--blur-shell);
+      -webkit-backdrop-filter: var(--blur-shell);
+      border: 0.5px solid rgba(255,255,255,0.6);
+      border-radius: var(--r-lg);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.7), var(--shadow-window);
+    }
+    .glass-sidebar {
+      background: linear-gradient(180deg, rgba(255,255,255,0.45), rgba(255,255,255,0.25));
+      backdrop-filter: var(--blur-chrome);
+      -webkit-backdrop-filter: var(--blur-chrome);
+    }
+    .glass-topbar {
+      background: linear-gradient(180deg, rgba(255,255,255,0.5), rgba(255,255,255,0.2));
+      backdrop-filter: var(--blur-chrome);
+      -webkit-backdrop-filter: var(--blur-chrome);
+      border-bottom: 0.5px solid rgba(255,255,255,0.4);
+    }
+    .glass-modal {
+      background: rgba(255,255,255,0.75);
+      backdrop-filter: var(--blur-modal);
+      -webkit-backdrop-filter: var(--blur-modal);
+      border-radius: var(--r-lg);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.7), var(--shadow-lg);
+    }
+    .glass-modal-bg {
+      background: rgba(0,0,0,0.18);
+      backdrop-filter: var(--blur-backdrop);
+      -webkit-backdrop-filter: var(--blur-backdrop);
+    }
+    @supports not (backdrop-filter: blur(60px)) {
+      .glass-surface, .glass-card, .glass-shell, .glass-sidebar, .glass-topbar, .glass-modal {
+        background: rgba(255,255,255,0.92);
       }
     }
-    body > *:not(.usa-flag-bg) { position: relative; z-index: 1; }
+
+    /* Buttons */
+    .btn-primary {
+      background: var(--accent); color: #fff;
+      border-radius: var(--r-button); padding: 6px 14px; font-size: 13px; font-weight: 500;
+      border: 0; cursor: pointer; transition: background var(--dur-fast) var(--ease-out-apple);
+    }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-primary:focus-visible { outline: 3px solid var(--accent-ring); outline-offset: 1px; }
+    .btn-secondary {
+      background: rgba(0,0,0,0.04); color: var(--text-primary);
+      border-radius: var(--r-button); padding: 6px 14px; font-size: 13px; font-weight: 500;
+      border: 0.5px solid var(--border); cursor: pointer;
+    }
+    .btn-ghost {
+      background: transparent; color: var(--text-secondary);
+      border-radius: var(--r-button); padding: 6px 10px; font-size: 13px;
+      border: 0; cursor: pointer;
+    }
+    .btn-warning { background: var(--amber); color: #fff; border-radius: var(--r-button); padding: 6px 14px; font-size: 13px; font-weight: 500; border: 0; }
 
     /* Pallino animato per stato salvataggio */
     @keyframes pulse-dot { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
@@ -153,12 +247,6 @@
   </style>
 </head>
 <body class="bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200 min-h-screen antialiased">
-
-<div class="usa-flag-bg" aria-hidden="true">
-  <video autoplay loop muted playsinline preload="auto" disablepictureinpicture disableremoteplayback>
-    <source src="276973.mp4" type="video/mp4">
-  </video>
-</div>
 
 <div x-data="app()" x-init="init()" x-cloak class="flex flex-col min-h-screen">
 
