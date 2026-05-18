@@ -1341,6 +1341,41 @@
             data-testid="undo-button"
             @click="eseguiUndo()">Annulla</button>
   </div>
+
+  <!-- ===== Toast generico (warn/info/success/error) ===== -->
+  <div x-show="toast.active"
+       x-transition.opacity.duration.200ms
+       class="fixed top-4 inset-x-0 mx-auto max-w-md glass-card border-l-4 px-4 py-3 z-40 cursor-pointer"
+       :class="{
+         'border-red-500': toast.type === 'error',
+         'border-yellow-500': toast.type === 'warn',
+         'border-green-500': toast.type === 'success',
+         'border-blue-500': toast.type === 'info'
+       }"
+       data-testid="generic-toast"
+       @click="dismissGenericToast()">
+    <span class="text-sm" x-text="toast.message"></span>
+  </div>
+
+  <!-- ===== Soft-confirm modal (rimpiazza confirm() per importo=0) ===== -->
+  <div x-show="softConfirm.active"
+       class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+       data-testid="soft-confirm-modal"
+       @keydown.escape.window="softConfirm.onCancel && softConfirm.onCancel()">
+    <div class="glass-card max-w-sm w-full mx-4 p-4">
+      <p class="text-sm" x-text="softConfirm.message"></p>
+      <div class="mt-4 flex justify-end gap-2">
+        <button type="button"
+                class="text-sm px-3 py-1 rounded border border-gray-300"
+                data-testid="soft-confirm-cancel"
+                @click="softConfirm.onCancel && softConfirm.onCancel()">Annulla</button>
+        <button type="button"
+                class="text-sm px-3 py-1 rounded bg-primary-500 text-white"
+                data-testid="soft-confirm-ok"
+                @click="softConfirm.onConfirm && softConfirm.onConfirm()">Conferma</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- ============================================================

@@ -415,6 +415,27 @@ function app() {
       this.salva();
     },
 
+    // --- Soft-confirm modal Alpine (rimpiazza confirm() per importo=0) ---
+    softConfirm: { active: false, message: '', onConfirm: null, onCancel: null },
+    chiediConferma(message) {
+      return new Promise((resolve) => {
+        this.softConfirm.active = true;
+        this.softConfirm.message = message;
+        this.softConfirm.onConfirm = () => {
+          this.softConfirm.active = false;
+          this.softConfirm.onConfirm = null;
+          this.softConfirm.onCancel = null;
+          resolve(true);
+        };
+        this.softConfirm.onCancel = () => {
+          this.softConfirm.active = false;
+          this.softConfirm.onConfirm = null;
+          this.softConfirm.onCancel = null;
+          resolve(false);
+        };
+      });
+    },
+
     // --- Toast generico (warn/info/success/error) — slot singolo, replace-on-new ---
     toast: { active: false, type: 'info', message: '', timerId: null },
     mostraToast(type, message, durata = 4000) {
@@ -940,8 +961,22 @@ function app() {
 
     // Modifica incasso esistente tramite modal
     apriFormIncasso(inc) { this.incassoInModifica = { ...inc }; },
-    salvaIncassoModificato() {
+    async salvaIncassoModificato() {
       if (!this.incassoInModifica) return;
+      // Importo=0 soft-confirm (rimpiazza l'antico confirm() nativo).
+      if (!(this.incassoInModifica.importo > 0)) {
+        const ok = await this.chiediConferma('L\'importo dell\'incasso e 0. Confermi il salvataggio?');
+        if (!ok) return;
+      }
+      // Banca-missing warn non bloccante.
+      if (!this.incassoInModifica.bancaId) {
+        this.mostraToast('warn', 'Nessuna banca selezionata: l\'incasso non sara conteggiato nei totali per banca.');
+      }
+      // Currency-mismatch warn non bloccante (banche[].currency esiste gia, R-G risolto).
+      const banca = this.dati.banche.find(b => b.id === this.incassoInModifica.bancaId);
+      if (banca && this.incassoInModifica.currency && (banca.currency || 'EUR') !== this.incassoInModifica.currency) {
+        this.mostraToast('warn', 'Valuta incasso (' + this.incassoInModifica.currency + ') diversa dalla banca (' + (banca.currency || 'EUR') + ').');
+      }
       // Cerca solo fra gli incassi attivi: un incasso soft-deleted non deve essere modificabile.
       const idx = this.dati.incassiAffitti.findIndex(i => i.id === this.incassoInModifica.id && !i.deletedAt);
       if (idx >= 0) {
@@ -1086,27 +1121,26 @@ function app() {
         currency: 'EUR', deletedAt: null, note: '' };
     },
     modificaProprieta(p) { this.editProprieta = { ...p }; this.mostraFormProprieta = true; },
-    salvaProprieta() {
+    async salvaProprieta() {
       if (!this.editProprieta.nome) return alert('Inserire il nome');
-      // Warning soft se importo mensile = 0 (non genererebbe incassi e sparisce dal calendario)
+      // Soft-confirm modal Alpine (rimpiazza confirm() nativo per coerenza UX con incasso).
       if (!(this.editProprieta.importoAffittoMensile > 0)) {
-        const ok = confirm('Attenzione: importo mensile = ' + (this.editProprieta.importoAffittoMensile || 0) + '.\n\nLa proprieta NON apparira come incasso sul calendario finche l\'importo non sara > 0.\n\nSalvare comunque?');
+        const ok = await this.chiediConferma('Attenzione: importo mensile = ' + (this.editProprieta.importoAffittoMensile || 0) + '. La proprieta NON apparira come incasso sul calendario. Salvare comunque?');
         if (!ok) return;
       }
-      // Warning soft se banca incasso/destinazione hanno valuta diversa dalla proprieta
+      // Currency-mismatch: degradato a toast warn non bloccante (coerenza con incasso).
       const valutaProp = this.editProprieta.currency || 'EUR';
       const bancaIncasso = this.dati.banche.find(b => b.id === this.editProprieta.bancaIncasso);
       const bancaDest = this.dati.banche.find(b => b.id === this.editProprieta.bancaDestinazione);
       const conflitti = [];
       if (bancaIncasso && (bancaIncasso.currency || 'EUR') !== valutaProp) {
-        conflitti.push(`banca di incasso "${bancaIncasso.nome}" (${bancaIncasso.currency || 'EUR'})`);
+        conflitti.push('banca di incasso "' + bancaIncasso.nome + '" (' + (bancaIncasso.currency || 'EUR') + ')');
       }
       if (bancaDest && (bancaDest.currency || 'EUR') !== valutaProp) {
-        conflitti.push(`banca di destinazione "${bancaDest.nome}" (${bancaDest.currency || 'EUR'})`);
+        conflitti.push('banca di destinazione "' + bancaDest.nome + '" (' + (bancaDest.currency || 'EUR') + ')');
       }
       if (conflitti.length > 0) {
-        const ok = confirm(`Attenzione: la proprieta e in ${valutaProp} ma ${conflitti.join(' e ')} ha valuta diversa.\n\nContinuare comunque?`);
-        if (!ok) return;
+        this.mostraToast('warn', 'Valuta proprieta (' + valutaProp + ') diversa da ' + conflitti.join(' e ') + '.');
       }
       if (this.editProprieta.id) {
         const idx = this.dati.proprieta.findIndex(p => p.id === this.editProprieta.id && !p.deletedAt);
