@@ -1,5 +1,10 @@
 // tests/cestino.spec.ts — PR1 CESTINO round-trip + hard-delete cascading.
 // REQ-SAFE-01 (soft-delete) + REQ-SAFE-02 (cestino view) + REQ-SAFE-05 (cascading).
+//
+// Selector note: cascading soft-delete fa apparire DUE righe nel cestino (la
+// proprieta + il suo incasso, etichettato "<mese> - <nomeProprieta>"). Entrambe
+// contengono il testo del nome proprieta. I filter() chained su tipo
+// disambiguano fra la riga Proprieta e la riga Incasso.
 
 import { test, expect, doLogin } from './fixtures';
 
@@ -14,19 +19,23 @@ test.describe('CRITICAL-04: cestino soft-delete + ripristina', () => {
     await expect(propRow).toHaveCount(1);
     await propRow.locator('button:has-text("Elimina")').click();
 
-    // 2. Riga sparisce dalla tabella attive (l'x-for ora usa attivi(dati.proprieta)).
+    // 2. Riga sparisce dalla tabella attive.
     await expect(propRow).toHaveCount(0, { timeout: 5_000 });
 
-    // 3. La proprieta compare nel Cestino.
+    // 3. La proprieta compare nel Cestino. Filtro doppio per disambiguare dalla
+    //    riga Incasso cascadata che ha la stessa stringa nome.
     const cestino = page.locator('[data-testid="cestino-section"]');
     await expect(cestino).toBeVisible();
-    const cestinoRow = cestino.locator('tbody tr').filter({ hasText: 'Appartamento Test Via Roma' });
-    await expect(cestinoRow).toHaveCount(1);
+    const cestinoPropRow = cestino
+      .locator('tbody tr')
+      .filter({ hasText: 'Appartamento Test Via Roma' })
+      .filter({ hasText: 'Proprieta' });
+    await expect(cestinoPropRow).toHaveCount(1);
 
-    // 4. Click Ripristina -> ricompare nelle proprieta attive.
-    await cestinoRow.locator('button:has-text("Ripristina")').click();
+    // 4. Click Ripristina sulla riga proprieta -> ricompare nelle proprieta attive.
+    await cestinoPropRow.locator('button:has-text("Ripristina")').click();
     await expect(propRow).toHaveCount(1, { timeout: 5_000 });
-    await expect(cestinoRow).toHaveCount(0);
+    await expect(cestinoPropRow).toHaveCount(0);
   });
 
   test('CESTINO-02 hard-delete cascading: Elimina definitivamente rimuove anche gli incassi figli', async ({ page, seedData }) => {
@@ -41,15 +50,23 @@ test.describe('CRITICAL-04: cestino soft-delete + ripristina', () => {
       .locator('button:has-text("Elimina")')
       .click();
 
-    // 2. Nel cestino click Elimina definitivamente -> accetta confirm nativo.
+    // 2. Nel cestino click Elimina definitivamente sulla riga PROPRIETA
+    //    (non sull'incasso cascadato che ha la stessa stringa).
     const cestino = page.locator('[data-testid="cestino-section"]');
-    const cestinoRow = cestino.locator('tbody tr').filter({ hasText: 'Appartamento Test Via Roma' });
-    await expect(cestinoRow).toHaveCount(1);
+    const cestinoPropRow = cestino
+      .locator('tbody tr')
+      .filter({ hasText: 'Appartamento Test Via Roma' })
+      .filter({ hasText: 'Proprieta' });
+    await expect(cestinoPropRow).toHaveCount(1);
     page.once('dialog', (d) => d.accept());
-    await cestinoRow.locator('button:has-text("Elimina definitivamente")').click();
+    await cestinoPropRow.locator('button:has-text("Elimina definitivamente")').click();
 
-    // 3. La riga sparisce dal cestino.
-    await expect(cestinoRow).toHaveCount(0, { timeout: 5_000 });
+    // 3. Tutte le righe relative a "Appartamento Test Via Roma" spariscono
+    //    dal cestino (cascading hard-delete sugli incassi figli).
+    const tutteLeRigheNelCestino = cestino
+      .locator('tbody tr')
+      .filter({ hasText: 'Appartamento Test Via Roma' });
+    await expect(tutteLeRigheNelCestino).toHaveCount(0, { timeout: 5_000 });
 
     // 4. Reload: niente trace della proprieta nelle tabelle attive ne nel cestino.
     await page.reload();
