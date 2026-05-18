@@ -617,7 +617,7 @@
       </div>
       <!-- Card proprieta -->
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
-        <template x-for="p in dati.proprieta" :key="p.id">
+        <template x-for="p in attivi(dati.proprieta)" :key="p.id">
           <div class="bg-white dark:bg-gray-800 rounded-xl ring-1 ring-gray-200 dark:ring-gray-700 p-3 cursor-pointer transition duration-200 hover:shadow-lg hover:-translate-y-0.5 hover:ring-primary-300 dark:hover:ring-primary-700"
                @click="apriProprieta(p.id)">
             <div class="flex items-center justify-between mb-2">
@@ -794,7 +794,7 @@
       <template x-if="!proprietaSelezionata">
         <div>
           <div class="prop-grid">
-            <template x-for="(p, idx) in dati.proprieta" :key="p.id">
+            <template x-for="(p, idx) in attivi(dati.proprieta)" :key="p.id">
               <button type="button" class="glass-card prop-card" @click="apriProprieta(p.id)">
                 <div class="prop-banner" :style="'background: var(--banner-' + ((idx % 9) + 1) + ');'"></div>
                 <div class="prop-body">
@@ -985,7 +985,7 @@
       <div class="filter-row">
         <select x-model="filtroUtenzeProprieta">
           <option value="">Tutte le proprieta</option>
-          <template x-for="p in dati.proprieta" :key="p.id"><option :value="p.id" x-text="p.nome"></option></template>
+          <template x-for="p in attivi(dati.proprieta)" :key="p.id"><option :value="p.id" x-text="p.nome"></option></template>
         </select>
         <select x-model="filtroUtenzeTipo">
           <option value="">Tutti i tipi</option>
@@ -1007,7 +1007,7 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div><label class="text-xs">Proprieta</label>
             <select x-model="nuovaUtenza.proprietaId" class="w-full text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600">
-              <template x-for="p in dati.proprieta" :key="p.id"><option :value="p.id" x-text="p.nome"></option></template>
+              <template x-for="p in attivi(dati.proprieta)" :key="p.id"><option :value="p.id" x-text="p.nome"></option></template>
             </select></div>
           <div><label class="text-xs">Tipo</label>
             <select x-model="nuovaUtenza.tipo" class="w-full text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600">
@@ -1134,7 +1134,7 @@
               <th class="text-right">Importo</th><th class="text-left">Valuta</th><th class="text-left">Banca</th><th class="text-left">Intestatario</th><th class="text-left">Azioni</th>
             </tr></thead>
             <tbody>
-              <template x-for="p in dati.proprieta" :key="p.id">
+              <template x-for="p in attivi(dati.proprieta)" :key="p.id">
                 <tr class="border-t border-gray-100 dark:border-gray-700">
                   <td class="font-medium" x-text="p.nome"></td><td x-text="p.tipo"></td>
                   <td x-text="labelScadenza(p.scadenzaAffitto)"></td>

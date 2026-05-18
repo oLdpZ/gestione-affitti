@@ -7,37 +7,32 @@ test.describe('UNDO toast (5s, stack model)', () => {
   test('UNDO-01: delete incasso -> undo toast visible -> Annulla -> incasso ricompare', async ({ page, seedData }) => {
     await doLogin(page);
 
-    // 1. Genera l'incasso del mese (calendario, button "+ Genera incassi mancanti" applica il template prop-test-001).
-    // MOCK_DATI parte con incassiAffitti: [] ma generaIncassiAttesi gira a load.
-    // Apri il Calendario e individua l'incasso di Appartamento Test Via Roma.
+    // Nel Calendario gli incassi del mese sono renderizzati come calendar-card,
+    // ciascuno con un button title="Elimina" che invoca eliminaIncasso(inc.id).
     await page.click('button:has-text("Calendario")');
-    const calendarCard = page
+    const card = page
       .locator('[data-testid="calendar-card"]')
-      .filter({ hasText: 'Appartamento Test Via Roma' });
-    await expect(calendarCard.first()).toBeVisible();
-
-    // 2. Apri il modal di modifica dell'incasso e usa il bottone elimina (X) dalla lista.
-    // Piu robusto: vai alla Dashboard, l'incasso del mese e' nella tabella.
-    await page.click('button:has-text("Dashboard")');
-    const row = page
-      .locator('tr')
       .filter({ hasText: 'Appartamento Test Via Roma' })
       .first();
-    await expect(row).toBeVisible();
-    const deleteBtn = row.locator('button[title="Elimina"]');
-    await expect(deleteBtn).toBeVisible();
-    await deleteBtn.click();
+    await expect(card).toBeVisible();
 
-    // 3. Undo toast appare entro 500ms.
+    await card.locator('button[title="Elimina"]').click();
+
+    // Undo toast appare entro 1.5s con il testo "Incasso eliminato".
     const toast = page.locator('[data-testid="undo-toast"]');
     await expect(toast).toBeVisible({ timeout: 1_500 });
-    await expect(toast).toContainText('eliminato');
+    await expect(toast).toContainText('Incasso eliminato');
 
-    // 4. Click Annulla -> toast scompare.
+    // Card sparisce dal calendario (eliminaIncasso ha settato deletedAt).
+    await expect(
+      page.locator('[data-testid="calendar-card"]').filter({ hasText: 'Appartamento Test Via Roma' }),
+    ).toHaveCount(0);
+
+    // Click Annulla -> toast scompare e card ricompare.
     await page.locator('[data-testid="undo-button"]').click();
     await expect(toast).not.toBeVisible({ timeout: 1_000 });
-
-    // 5. La riga incasso e' tornata.
-    await expect(row).toBeVisible();
+    await expect(
+      page.locator('[data-testid="calendar-card"]').filter({ hasText: 'Appartamento Test Via Roma' }).first(),
+    ).toBeVisible({ timeout: 2_000 });
   });
 });
