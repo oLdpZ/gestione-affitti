@@ -686,10 +686,14 @@
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <template x-for="gruppo in gruppiCalendario()" :key="gruppo.label">
           <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3">
-            <h3 class="font-bold text-sm mb-2 text-primary-600 dark:text-primary-400" x-text="gruppo.label"></h3>
+            <h3 class="font-bold text-sm mb-2 text-primary-600 dark:text-primary-400"
+                :data-testid="gruppo.label && /[Ii]ncassi orfani/.test(gruppo.label) ? 'orfani-group' : null"
+                x-text="gruppo.label"></h3>
             <div class="space-y-2">
               <template x-for="inc in gruppo.incassi" :key="inc.id">
-                <div class="flex items-center justify-between p-2 rounded-md gap-2"
+                <div class="flex items-center justify-between p-2 rounded-md gap-2 glass-card calendar-card"
+                     data-testid="calendar-card"
+                     :data-status="inc.dataIncasso ? 'incassato' : (isRitardo(inc) ? 'ritardo' : 'attesa')"
                      :class="inc.dataIncasso ? 'bg-green-50 dark:bg-green-900/30' : (isRitardo(inc) ? 'bg-red-50 dark:bg-red-900/30' : 'bg-gray-50 dark:bg-gray-700/50')">
                   <div class="flex-1 min-w-0">
                     <div class="text-sm font-medium truncate" x-text="nomeProprieta(inc.proprietaId)"></div>
@@ -708,7 +712,9 @@
                 </div>
               </template>
               <template x-for="prop in gruppo.mancanti" :key="'mancante-'+prop.id">
-                <div class="flex items-center justify-between p-2 rounded-md gap-2 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-300 dark:border-yellow-700">
+                <div class="flex items-center justify-between p-2 rounded-md gap-2 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-300 dark:border-yellow-700 glass-card calendar-card"
+                     data-testid="calendar-card"
+                     data-status="sistema">
                   <div class="flex-1 min-w-0">
                     <div class="text-sm font-medium truncate" x-text="prop.nome"></div>
                     <div class="text-xs text-yellow-700 dark:text-yellow-400">&#9888; Importo mensile = <span x-text="prop.importoAffittoMensile || 0"></span> &mdash; nessun incasso generato</div>

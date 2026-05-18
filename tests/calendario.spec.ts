@@ -9,7 +9,7 @@ test.describe('calendario', () => {
     await page.click('button:has-text("Calendario")');
 
     const card = page
-      .locator('.bg-yellow-50, [class*="yellow-900"]')
+      .locator('[data-testid="calendar-card"][data-status="sistema"]')
       .filter({ hasText: 'Appartamento Importo Zero' });
     await expect(card.first()).toBeVisible();
     await expect(card.first().locator('button:has-text("Sistema")')).toBeVisible();
@@ -54,7 +54,7 @@ test.describe('calendario', () => {
 
     // Pitfall 4: generaIncassiAttesi puo' aver gia' creato l'incasso a init.
     const card = page
-      .locator('.bg-gray-50, .bg-red-50')
+      .locator('[data-testid="calendar-card"][data-status="attesa"], [data-testid="calendar-card"][data-status="ritardo"]')
       .filter({ hasText: 'Appartamento Test Via Roma' });
     await expect(card.first()).toBeVisible();
 
@@ -67,14 +67,14 @@ test.describe('calendario', () => {
       .click();
 
     await expect(
-      page.locator('.bg-green-50').filter({ hasText: 'Appartamento Test Via Roma' }).first(),
+      page.locator('[data-testid="calendar-card"][data-status="incassato"]').filter({ hasText: 'Appartamento Test Via Roma' }).first(),
     ).toBeVisible({ timeout: 5_000 });
 
     expect(Date.now() - start).toBeLessThan(2_000);
 
     // Status dot esiste 2x (desktop + sm:hidden mobile) — first() per evitare strict mode.
     await expect(
-      page.locator('.status-dot.bg-green-500, .status-dot[class*="green-500"]').first(),
+      page.locator('[data-testid="status-dot"][data-status="salvato"]').first(),
     ).toBeVisible({ timeout: 10_000 });
   });
 
@@ -108,7 +108,7 @@ test.describe('calendario', () => {
       propSection.locator('td').filter({ hasText: 'Proprieta E2E Test' }),
     ).toBeVisible({ timeout: 5_000 });
     await expect(
-      page.locator('.status-dot.bg-green-500, .status-dot[class*="green-500"]').first(),
+      page.locator('[data-testid="status-dot"][data-status="salvato"]').first(),
     ).toBeVisible({ timeout: 10_000 });
   });
 });
