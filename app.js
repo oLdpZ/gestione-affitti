@@ -133,6 +133,29 @@ function app() {
     mostraFormBanca: false, editBanca: {},
 
     async init() {
+      // Error capture globale: registrato per primo cosi cattura anche errori
+      // sollevati durante il setup di Supabase/Alpine.
+      window.addEventListener('error', (ev) => {
+        this.pushErrore({
+          ts: new Date().toISOString(),
+          message: (ev && ev.message) || 'error',
+          stack: ev && ev.error && ev.error.stack ? String(ev.error.stack).slice(0, 1000) : null,
+          url: ev && ev.filename ? ev.filename : null,
+          line: ev && ev.lineno ? ev.lineno : null,
+          severity: 'error',
+        });
+      });
+      window.addEventListener('unhandledrejection', (ev) => {
+        const reason = ev && ev.reason;
+        const msg = reason && reason.message ? reason.message : String(reason || 'unhandledrejection');
+        this.pushErrore({
+          ts: new Date().toISOString(),
+          message: msg,
+          stack: reason && reason.stack ? String(reason.stack).slice(0, 1000) : null,
+          severity: 'error',
+        });
+      });
+
       // Pulizia: rimuove chiave localStorage obsoleta e service worker stale da versioni precedenti
       try { localStorage.removeItem('gestione_affitti_dati'); } catch (e) {}
       if ('serviceWorker' in navigator) {
@@ -216,6 +239,28 @@ function app() {
     },
 
     supportWhatsapp: SUPPORT_WHATSAPP,
+
+    /** Aggiunge un'entry al ring buffer FIFO di 50 errori in localStorage.errori.
+     *  Mai re-throwa: solo log + storage. Filtra implicitamente i campi: niente PII. */
+    pushErrore(entry) {
+      try {
+        const raw = localStorage.getItem('errori');
+        const arr = raw ? JSON.parse(raw) : [];
+        const lista = Array.isArray(arr) ? arr : [];
+        lista.push({
+          ts: entry && entry.ts ? entry.ts : new Date().toISOString(),
+          message: entry && entry.message ? String(entry.message).slice(0, 500) : '',
+          stack: entry && entry.stack ? String(entry.stack).slice(0, 1000) : null,
+          url: entry && entry.url ? String(entry.url).slice(0, 300) : null,
+          line: entry && typeof entry.line === 'number' ? entry.line : null,
+          severity: entry && entry.severity ? entry.severity : 'error',
+        });
+        while (lista.length > 50) lista.shift();
+        localStorage.setItem('errori', JSON.stringify(lista));
+      } catch (_) {
+        // Quota piena o storage non disponibile: silenzioso (non vogliamo loop di errori).
+      }
+    },
 
     // --- Autenticazione ---
     async eseguiLogin() {
