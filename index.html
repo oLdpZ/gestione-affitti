@@ -791,7 +791,7 @@
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <template x-for="p in dati.proprieta" :key="p.id">
               <div @click="apriProprieta(p.id)"
-                   class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 cursor-pointer hover:shadow-md transition-shadow">
+                   class="glass-card bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 cursor-pointer hover:shadow-md transition-shadow">
                 <h3 class="font-semibold" x-text="p.nome"></h3>
                 <div class="text-xs text-gray-500 mt-1" x-text="formatValuta(p.importoAffittoMensile, p.currency) + '/mese — ' + p.intestatario"></div>
               </div>
@@ -802,7 +802,7 @@
       <template x-if="proprietaSelezionata">
         <div>
           <button @click="proprietaSelezionata = null" class="text-sm text-primary-600 dark:text-primary-400 mb-3 hover:underline">&larr; Tutte le proprieta</button>
-          <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 mb-4">
+          <div class="glass-card bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 mb-4">
             <h2 class="text-lg font-bold" x-text="getProprieta(proprietaSelezionata).nome"></h2>
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mt-2 text-xs">
               <div>Tipo: <span class="font-medium" x-text="getProprieta(proprietaSelezionata).tipo"></span></div>
