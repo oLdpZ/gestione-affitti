@@ -49,9 +49,10 @@ function datiEsempio() {
     intestatario: i % 2 === 0 ? 'Stefano Desio' : 'Gina Desio',
     bancaDestinazione: i % 2 === 0 ? bBPER.id : bBPM.id,
     currency: 'EUR',
+    deletedAt: null,
     note: ''
   }));
-  return { dataVersion: 2, proprieta, banche: [bBPM, bBPER], incassiAffitti: [], utenze: [] };
+  return { dataVersion: 3, proprieta, banche: [bBPM, bBPER], incassiAffitti: [], utenze: [] };
 }
 
 /** Migrazione schema dati: idempotente, applica cambiamenti incrementali per versione. */
@@ -71,6 +72,18 @@ function migraDati(dati) {
       for (const u of dati.utenze) { if (!u.currency) u.currency = 'EUR'; }
     }
     dati.dataVersion = 2;
+  }
+  if (!dati.dataVersion || dati.dataVersion < 3) {
+    if (Array.isArray(dati.proprieta)) {
+      for (const p of dati.proprieta) { if (!('deletedAt' in p)) p.deletedAt = null; }
+    }
+    if (Array.isArray(dati.incassiAffitti)) {
+      for (const i of dati.incassiAffitti) {
+        if (!('deletedAt' in i)) i.deletedAt = null;
+        if (!('modificatoManualmente' in i)) i.modificatoManualmente = false;
+      }
+    }
+    dati.dataVersion = 3;
   }
   return dati;
 }
@@ -170,6 +183,14 @@ function app() {
           }
         }
       });
+    },
+
+    /** Filtra un array escludendo gli elementi soft-deleted (deletedAt valorizzato).
+     *  Centralizza il filtro per i read site: tutti gli iteratori/find/filter su
+     *  proprieta + incassiAffitti devono passare per qui. */
+    attivi(arr) {
+      if (!Array.isArray(arr)) return [];
+      return arr.filter(x => !x.deletedAt);
     },
 
     // --- Autenticazione ---
@@ -392,8 +413,8 @@ function app() {
         mesi.push(yy + '-' + String(mm).padStart(2, '0'));
       }
       for (const mese of mesi) {
-        for (const prop of this.dati.proprieta) {
-          const esistente = this.dati.incassiAffitti.find(i => i.proprietaId === prop.id && i.mese === mese);
+        for (const prop of this.attivi(this.dati.proprieta)) {
+          const esistente = this.attivi(this.dati.incassiAffitti).find(i => i.proprietaId === prop.id && i.mese === mese);
           if (esistente) {
             // Aggiorna incassi non ancora incassati con i nuovi dati della proprieta
             if (!esistente.dataIncasso) {
@@ -410,7 +431,9 @@ function app() {
               dataIncasso: null, importo: prop.importoAffittoMensile,
               bancaId: prop.bancaIncasso, girato: false,
               dataGiro: null, bancaDestinazioneId: null,
-              currency: prop.currency || 'EUR', note: ''
+              currency: prop.currency || 'EUR',
+              deletedAt: null, modificatoManualmente: false,
+              note: ''
             });
           }
         }
@@ -425,7 +448,7 @@ function app() {
     nomeMeseCorrente() { const d = new Date(); return this.nomiMesi[d.getMonth()] + ' ' + d.getFullYear(); },
 
     // --- Dashboard ---
-    incassiMeseCorrente() { const mc = meseCorrente(); return this.dati.incassiAffitti.filter(i => i.mese === mc); },
+    incassiMeseCorrente() { const mc = meseCorrente(); return this.attivi(this.dati.incassiAffitti).filter(i => i.mese === mc); },
     totaleIncassatoMese() {
       return this.incassiMeseCorrente().filter(i => i.dataIncasso).reduce((acc, i) => {
         const cur = i.currency || 'EUR';
@@ -441,7 +464,7 @@ function app() {
       }, { EUR: 0, USD: 0 });
     },
     statoAffittoMese(propId) {
-      const inc = this.dati.incassiAffitti.find(i => i.proprietaId === propId && i.mese === meseCorrente());
+      const inc = this.attivi(this.dati.incassiAffitti).find(i => i.proprietaId === propId && i.mese === meseCorrente());
       if (!inc) return '<span class="text-gray-400">\u2014</span>';
       if (inc.dataIncasso) return '<span class="text-green-600" title="Incassato">\u2705</span>';
       if (this.isRitardo(inc)) return '<span class="text-red-500" title="In ritardo">\u26A0\uFE0F</span>';
@@ -449,7 +472,7 @@ function app() {
     },
     isRitardo(inc) { return !inc.dataIncasso && inc.dataPrevista < oggi(); },
     totaleDaGirareBanca(bancaId) {
-      return this.dati.incassiAffitti.filter(i => i.bancaId === bancaId && i.dataIncasso && !i.girato).reduce((acc, i) => {
+      return this.attivi(this.dati.incassiAffitti).filter(i => i.bancaId === bancaId && i.dataIncasso && !i.girato).reduce((acc, i) => {
         const cur = i.currency || 'EUR';
         acc[cur] = (acc[cur] || 0) + (i.importo || 0);
         return acc;
@@ -457,9 +480,9 @@ function app() {
     },
     totaleDaGirareVersoBanca(bancaDestId) {
       // Somma incassi non girati la cui proprietà ha come bancaDestinazione questa banca
-      return this.dati.incassiAffitti.filter(i => {
+      return this.attivi(this.dati.incassiAffitti).filter(i => {
         if (!i.dataIncasso || i.girato) return false;
-        const prop = this.dati.proprieta.find(p => p.id === i.proprietaId);
+        const prop = this.attivi(this.dati.proprieta).find(p => p.id === i.proprietaId);
         return prop && prop.bancaDestinazione === bancaDestId;
       }).reduce((acc, i) => {
         const cur = i.currency || 'EUR';
@@ -487,19 +510,19 @@ function app() {
     // --- Calendario ---
     gruppiCalendario() {
       const mese = this.annoCalendario + '-' + String(this.meseCalendario + 1).padStart(2, '0');
-      const incM = this.dati.incassiAffitti.filter(i => i.mese === mese);
+      const incM = this.attivi(this.dati.incassiAffitti).filter(i => i.mese === mese);
       const g1 = { label: 'Giorno 1', incassi: [], mancanti: [] };
       const g15 = { label: 'Giorno 15', incassi: [], mancanti: [] };
       const gfine = { label: 'Fine mese', incassi: [], mancanti: [] };
       const bucket = (s) => s === '1' ? g1 : (s === '15' ? g15 : gfine);
       const orfani = [];
       for (const inc of incM) {
-        const prop = this.dati.proprieta.find(p => p.id === inc.proprietaId);
+        const prop = this.attivi(this.dati.proprieta).find(p => p.id === inc.proprietaId);
         if (!prop) { orfani.push(inc); continue; }
         bucket(prop.scadenzaAffitto).incassi.push(inc);
       }
       // Proprietà esistenti senza incasso per il mese (di solito perché importo mensile = 0)
-      for (const prop of this.dati.proprieta) {
+      for (const prop of this.attivi(this.dati.proprieta)) {
         const ha = incM.some(i => i.proprietaId === prop.id);
         if (!ha) bucket(prop.scadenzaAffitto).mancanti.push(prop);
       }
@@ -521,8 +544,8 @@ function app() {
       const mese = this.annoCalendario + '-' + String(this.meseCalendario + 1).padStart(2, '0');
       let creati = 0;
       const saltate = [];
-      for (const prop of this.dati.proprieta) {
-        const esiste = this.dati.incassiAffitti.some(i => i.proprietaId === prop.id && i.mese === mese);
+      for (const prop of this.attivi(this.dati.proprieta)) {
+        const esiste = this.attivi(this.dati.incassiAffitti).some(i => i.proprietaId === prop.id && i.mese === mese);
         if (esiste) continue;
         if (!(prop.importoAffittoMensile > 0)) { saltate.push(prop.nome); continue; }
         this.dati.incassiAffitti.push({
@@ -531,7 +554,9 @@ function app() {
           dataIncasso: null, importo: prop.importoAffittoMensile,
           bancaId: prop.bancaIncasso, girato: false,
           dataGiro: null, bancaDestinazioneId: null,
-          currency: prop.currency || 'EUR', note: ''
+          currency: prop.currency || 'EUR',
+          deletedAt: null, modificatoManualmente: false,
+          note: ''
         });
         creati++;
       }
@@ -548,7 +573,8 @@ function app() {
     apriFormIncasso(inc) { this.incassoInModifica = { ...inc }; },
     salvaIncassoModificato() {
       if (!this.incassoInModifica) return;
-      const idx = this.dati.incassiAffitti.findIndex(i => i.id === this.incassoInModifica.id);
+      // Cerca solo fra gli incassi attivi: un incasso soft-deleted non deve essere modificabile.
+      const idx = this.dati.incassiAffitti.findIndex(i => i.id === this.incassoInModifica.id && !i.deletedAt);
       if (idx >= 0) {
         // Se dataIncasso e stringa vuota, convertila in null
         if (this.incassoInModifica.dataIncasso === '') this.incassoInModifica.dataIncasso = null;
@@ -567,7 +593,7 @@ function app() {
     apriProprieta(id) { this.proprietaSelezionata = id; this.vistaCorrente = 'proprieta'; },
     anniDisponibili() { const a = new Date().getFullYear(); return [a - 2, a - 1, a, a + 1]; },
     storicoIncassiProprieta(propId, anno) {
-      return this.dati.incassiAffitti.filter(i => i.proprietaId === propId && i.mese.startsWith(String(anno)))
+      return this.attivi(this.dati.incassiAffitti).filter(i => i.proprietaId === propId && i.mese.startsWith(String(anno)))
         .sort((a, b) => b.dataPrevista.localeCompare(a.dataPrevista));
     },
     totaleIncassiAnno(propId, anno) {
@@ -591,7 +617,7 @@ function app() {
 
     // --- Movimenti banca ---
     incassiBancaMese(bancaId) {
-      return this.dati.incassiAffitti.filter(i => i.bancaId === bancaId && i.mese === this.meseBanca)
+      return this.attivi(this.dati.incassiAffitti).filter(i => i.bancaId === bancaId && i.mese === this.meseBanca)
         .sort((a, b) => (a.dataPrevista || '').localeCompare(b.dataPrevista || ''));
     },
     totaleIncassatoBancaMese(bancaId) {
@@ -621,8 +647,9 @@ function app() {
 
     // --- Utenze ---
     resetFormUtenza() {
+      const propAttive = this.attivi(this.dati.proprieta);
       this.nuovaUtenza = {
-        proprietaId: this.dati.proprieta.length > 0 ? this.dati.proprieta[0].id : '',
+        proprietaId: propAttive.length > 0 ? propAttive[0].id : '',
         tipo: 'acqua', fornitore: '', periodoRiferimento: '',
         dataScadenza: '', importo: 0, stato: 'da_ricevere', currency: 'EUR', note: ''
       };
@@ -644,7 +671,7 @@ function app() {
       }, { EUR: 0, USD: 0 });
     },
     aggiungiUtenza() {
-      const prop = this.dati.proprieta.find(p => p.id === this.nuovaUtenza.proprietaId);
+      const prop = this.attivi(this.dati.proprieta).find(p => p.id === this.nuovaUtenza.proprietaId);
       const currency = this.nuovaUtenza.currency || (prop && prop.currency) || 'EUR';
       this.dati.utenze.push({ id: uid(), ...this.nuovaUtenza, currency });
       this.mostraFormUtenza = false; this.resetFormUtenza(); this.salva();
@@ -663,7 +690,7 @@ function app() {
     creaProprieta() {
       return { id: null, nome: '', tipo: 'appartamento', scadenzaAffitto: '1',
         importoAffittoMensile: 0, bancaIncasso: '', intestatario: '', bancaDestinazione: '',
-        currency: 'EUR', note: '' };
+        currency: 'EUR', deletedAt: null, note: '' };
     },
     modificaProprieta(p) { this.editProprieta = { ...p }; this.mostraFormProprieta = true; },
     salvaProprieta() {
@@ -689,7 +716,7 @@ function app() {
         if (!ok) return;
       }
       if (this.editProprieta.id) {
-        const idx = this.dati.proprieta.findIndex(p => p.id === this.editProprieta.id);
+        const idx = this.dati.proprieta.findIndex(p => p.id === this.editProprieta.id && !p.deletedAt);
         if (idx >= 0) this.dati.proprieta[idx] = { ...this.editProprieta };
       } else { this.editProprieta.id = uid(); this.dati.proprieta.push({ ...this.editProprieta }); }
       this.mostraFormProprieta = false; this.generaIncassiAttesi(); this.salva();
@@ -714,8 +741,8 @@ function app() {
       this.mostraFormBanca = false; this.salva();
     },
     eliminaBanca(id) {
-      const nIncassi = this.dati.incassiAffitti.filter(i => i.bancaId === id || i.bancaDestinazioneId === id).length;
-      const nProp = this.dati.proprieta.filter(p => p.bancaIncasso === id || p.bancaDestinazione === id).length;
+      const nIncassi = this.attivi(this.dati.incassiAffitti).filter(i => i.bancaId === id || i.bancaDestinazioneId === id).length;
+      const nProp = this.attivi(this.dati.proprieta).filter(p => p.bancaIncasso === id || p.bancaDestinazione === id).length;
       if (nIncassi + nProp > 0) {
         alert('Impossibile eliminare: ' + nProp + ' proprietà e ' + nIncassi + ' incassi usano questa banca.');
         return;
