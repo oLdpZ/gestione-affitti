@@ -244,9 +244,88 @@
     @keyframes pulse-dot { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
     .status-dot { width: 0.5rem; height: 0.5rem; border-radius: 9999px; display: inline-block; }
     .status-dot.pulsing { animation: pulse-dot 1.2s ease-in-out infinite; }
+
+    /* ===== Window shell (T04) ===== */
+    .window-shell {
+      display: grid;
+      grid-template-columns: 232px 1fr;
+      height: 100vh; height: 100dvh;
+      background: rgba(255,255,255,0.20);
+      backdrop-filter: var(--blur-shell);
+      -webkit-backdrop-filter: var(--blur-shell);
+      border: 0.5px solid rgba(255,255,255,0.4);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.7), var(--shadow-window);
+      margin: 12px; border-radius: var(--r-lg);
+      overflow: hidden;
+      max-width: calc(100vw - 24px); max-height: calc(100vh - 24px);
+    }
+    .sidebar {
+      display: flex; flex-direction: column;
+      padding: 14px 12px; gap: 8px;
+      border-right: 0.5px solid var(--border);
+      z-index: var(--z-sidebar);
+    }
+    .traffic-lights { display: flex; gap: 6px; padding: 2px 4px 8px; }
+    .traffic-lights .tl { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+    .tl-red    { background: #ff5f57; }
+    .tl-amber  { background: #febc2e; }
+    .tl-green  { background: #28c840; }
+    .sidebar-logo { display: flex; gap: 10px; align-items: center; padding: 8px 4px 14px; }
+    .logo-mark { width: 28px; height: 28px; border-radius: var(--r-sm); background: var(--gradient-logo); flex-shrink: 0; }
+    .logo-name { font-family: var(--font-display); font-weight: 700; font-size: 15px; }
+    .logo-version { font-size: 11px; color: var(--text-tertiary); }
+    .sidebar-nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+    .sidebar-nav .section-eyebrow { padding: 12px 8px 4px; }
+    .nav-item {
+      text-align: left; padding: 6px 10px; border-radius: var(--r-xs);
+      background: transparent; border: 0; color: var(--text-secondary);
+      font-size: 13px; font-weight: 500; cursor: pointer;
+      transition: background var(--dur-fast) var(--ease-out-apple);
+    }
+    .nav-item:hover { background: rgba(0,0,0,0.04); color: var(--text-primary); }
+    .nav-item.is-active {
+      background: var(--accent); color: #fff;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.25);
+    }
+    .sidebar-user {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 8px; border-top: 0.5px solid var(--divider);
+      margin-top: auto;
+    }
+    .avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--gradient-avatar); flex-shrink: 0; }
+    .user-meta { flex: 1; min-width: 0; font-size: 12px; }
+    .user-email { color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .user-status { display: flex; align-items: center; gap: 6px; color: var(--text-tertiary); font-size: 11px; }
+
+    .main-pane { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+    .topbar {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 18px; border-bottom: 0.5px solid var(--divider);
+      z-index: var(--z-topbar);
+    }
+    .hamburger {
+      display: none; align-items: center; justify-content: center;
+      width: 32px; height: 32px; border-radius: var(--r-sm);
+      background: transparent; border: 0.5px solid var(--border); cursor: pointer;
+    }
+    .topbar-title { flex: 1; min-width: 0; }
+    .topbar-h1 { font-family: var(--font-display); font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
+    .topbar-actions { display: flex; gap: 10px; align-items: center; }
+    .search-pill {
+      display: none; align-items: center; gap: 8px;
+      padding: 6px 12px; border-radius: var(--r-pill);
+      background: rgba(0,0,0,0.04); color: var(--text-tertiary);
+      font-size: 12.5px;
+    }
+    .search-pill .kbd { font-family: var(--font-mono); font-size: 10.5px; padding: 1px 5px; background: rgba(0,0,0,0.06); border-radius: 4px; }
+    @media (min-width: 700px) { .search-pill { display: inline-flex; } }
+    .page-body {
+      flex: 1; min-height: 0; overflow: auto;
+      padding: 22px 28px;
+    }
   </style>
 </head>
-<body class="bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200 min-h-screen antialiased">
+<body class="bg-base">
 
 <div x-data="app()" x-init="init()" x-cloak class="flex flex-col min-h-screen">
 
@@ -305,75 +384,77 @@
 
   <!-- ===== APP PRINCIPALE (visibile solo se loggato) ===== -->
   <template x-if="utente && !caricamentoIniziale">
-  <div class="flex flex-col min-h-screen">
-
-  <!-- ===== HEADER / NAVIGAZIONE ===== -->
-  <header class="bg-gradient-to-r from-white via-gray-50 to-white dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 border-b border-gray-200 dark:border-gray-700 shadow-sm sticky top-0 z-50 backdrop-blur-sm bg-white/90 dark:bg-gray-800/90">
-    <!-- Barra principale -->
-    <div class="max-w-7xl mx-auto px-3 sm:px-4 flex items-center justify-between h-12 gap-2">
-      <!-- Logo + hamburger mobile -->
-      <div class="flex items-center gap-2 min-w-0">
-        <!-- Hamburger (solo mobile) -->
-        <button @click="mobileMenuOpen = !mobileMenuOpen" class="lg:hidden p-1.5 -ml-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700" aria-label="Menu">
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path x-show="!mobileMenuOpen" stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-            <path x-show="mobileMenuOpen" stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-        <h1 class="text-base font-bold text-primary-700 dark:text-primary-400 whitespace-nowrap">
-          <span class="lg:hidden">Affitti</span>
-          <span class="hidden lg:inline">Gestione Affitti</span>
-        </h1>
+  <div id="root" class="window-shell">
+    <aside class="sidebar glass-sidebar" :class="{ 'drawer-open': drawerOpen }">
+      <div class="traffic-lights" aria-hidden="true">
+        <span class="tl tl-red"></span><span class="tl tl-amber"></span><span class="tl tl-green"></span>
       </div>
-
-      <!-- Nav desktop/tablet (solo md+) -->
-      <nav class="hidden lg:flex gap-1 text-sm">
-        <template x-for="v in viste" :key="v.id">
-          <button @click="vistaCorrente = v.id"
-                  :class="vistaCorrente === v.id ? 'border-primary-600 text-primary-700 dark:text-primary-300 font-semibold' : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'"
-                  class="px-3 py-1.5 border-b-2 whitespace-nowrap transition-colors"
-                  x-text="v.label"></button>
-        </template>
-      </nav>
-
-      <!-- Info utente + logout -->
-      <div class="flex items-center gap-1.5 sm:gap-2 text-xs shrink-0">
-        <span class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs ring-1 ring-gray-200 dark:ring-gray-700 bg-white/70 dark:bg-gray-800/70">
-          <span class="status-dot" :class="{ 'bg-green-500': statoSalvataggio==='salvato', 'bg-amber-500 pulsing': statoSalvataggio==='salvataggio', 'bg-yellow-500': statoSalvataggio==='offline', 'bg-red-500': statoSalvataggio==='errore' }"></span>
-          <span x-text="statoSalvataggio==='salvato' ? 'Salvato' : statoSalvataggio==='salvataggio' ? 'Salvataggio…' : statoSalvataggio==='offline' ? 'Offline' : 'Errore'"></span>
-        </span>
-        <span class="sm:hidden status-dot" :class="{ 'bg-green-500': statoSalvataggio==='salvato', 'bg-amber-500 pulsing': statoSalvataggio==='salvataggio', 'bg-yellow-500': statoSalvataggio==='offline', 'bg-red-500': statoSalvataggio==='errore' }" :title="statoSalvataggio"></span>
-        <span class="text-gray-500 dark:text-gray-400 hidden md:inline truncate max-w-[150px]" x-text="utente?.email"></span>
-        <button @click="eseguiLogout()" class="px-2.5 py-1 bg-red-500 hover:bg-red-600 text-white rounded-lg text-xs font-medium shadow-sm transition active:scale-95">Esci</button>
-      </div>
-    </div>
-
-    <!-- Menu mobile dropdown -->
-    <div x-show="mobileMenuOpen" x-transition
-         @click.away="mobileMenuOpen = false"
-         class="lg:hidden border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-2 py-2">
-      <nav class="flex flex-col gap-0.5">
-        <template x-for="v in viste" :key="v.id">
-          <button @click="vistaCorrente = v.id; mobileMenuOpen = false"
-                  :class="vistaCorrente === v.id ? 'bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300 font-semibold' : 'hover:bg-gray-100 dark:hover:bg-gray-700'"
-                  class="px-3 py-2.5 rounded-md text-left text-sm transition-colors"
-                  x-text="v.label"></button>
-        </template>
-        <div class="border-t border-gray-200 dark:border-gray-700 mt-1 pt-2 px-3 text-xs text-gray-500 dark:text-gray-400 truncate">
-          <span x-text="utente?.email"></span>
+      <div class="sidebar-logo">
+        <span class="logo-mark" aria-hidden="true"></span>
+        <div>
+          <div class="logo-name">Affitti</div>
+          <div class="logo-version">v 2.0</div>
         </div>
-        <button @click="esportaJSON(); mobileMenuOpen = false" class="px-3 py-2 text-left text-sm text-primary-600 dark:text-primary-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md">&darr; Esporta backup JSON</button>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="section-eyebrow">PANORAMICA</div>
+        <template x-for="v in viste.filter(x => ['dashboard','calendario'].includes(x.id))" :key="v.id">
+          <button class="nav-item" :class="vistaCorrente === v.id ? 'is-active' : ''"
+                  @click="vistaCorrente = v.id; drawerOpen = false" x-text="v.label"></button>
+        </template>
+        <div class="section-eyebrow">GESTIONE</div>
+        <template x-for="v in viste.filter(x => ['proprieta','banche','utenze'].includes(x.id))" :key="v.id">
+          <button class="nav-item" :class="vistaCorrente === v.id ? 'is-active' : ''"
+                  @click="vistaCorrente = v.id; drawerOpen = false" x-text="v.label"></button>
+        </template>
+        <div class="section-eyebrow">ACCOUNT</div>
+        <template x-for="v in viste.filter(x => x.id === 'impostazioni')" :key="v.id">
+          <button class="nav-item" :class="vistaCorrente === v.id ? 'is-active' : ''"
+                  @click="vistaCorrente = v.id; drawerOpen = false" x-text="v.label"></button>
+        </template>
       </nav>
-    </div>
-  </header>
+      <div class="sidebar-user">
+        <span class="avatar"></span>
+        <div class="user-meta">
+          <div class="user-email" x-text="utente?.email"></div>
+          <div class="user-status">
+            <span class="status-dot"
+                  data-testid="status-dot"
+                  :data-status="statoSalvataggio"
+                  :class="{ 'bg-green-500': statoSalvataggio==='salvato', 'bg-amber-500 pulsing': statoSalvataggio==='salvataggio', 'bg-yellow-500': statoSalvataggio==='offline', 'bg-red-500': statoSalvataggio==='errore' }"></span>
+            <span x-text="statoSalvataggio==='salvato' ? 'Salvato' : statoSalvataggio==='salvataggio' ? 'Salvataggio…' : statoSalvataggio==='offline' ? 'Offline' : 'Errore'"></span>
+          </div>
+        </div>
+        <button class="btn-ghost" @click="eseguiLogout()" title="Esci">Esci</button>
+      </div>
+    </aside>
 
-  <!-- ===== BANNER MODALITÀ OFFLINE ===== -->
-  <div x-show="modalitaOffline" class="bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-200 text-sm px-4 py-2 text-center">
-    Modalità offline &mdash; stai vedendo dati dalla cache locale. Le modifiche saranno sincronizzate al ripristino della connessione.
-  </div>
+    <main class="main-pane">
+      <header class="topbar glass-topbar">
+        <button class="hamburger" @click="drawerOpen = true" aria-label="Apri menu">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 6h16M4 12h16M4 18h16" stroke-linecap="round"/></svg>
+        </button>
+        <div class="topbar-title">
+          <h1 class="topbar-h1" x-text="viste.find(v => v.id === vistaCorrente)?.label || 'Dashboard'"></h1>
+        </div>
+        <div class="topbar-actions">
+          <div class="search-pill" aria-disabled="true" title="Ricerca (presto)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3" stroke-linecap="round"/></svg>
+            <span class="search-text">Cerca…</span>
+            <kbd class="kbd">⌘K</kbd>
+          </div>
+          <button class="btn-secondary" @click="esportaJSON()">Esporta</button>
+        </div>
+      </header>
 
-  <!-- ===== CONTENUTO PRINCIPALE ===== -->
-  <main class="flex-1 max-w-7xl mx-auto w-full px-4 py-4">
+      <div class="drawer-backdrop" x-show="drawerOpen" x-transition.opacity @click="drawerOpen = false"></div>
+
+      <!-- ===== BANNER MODALITÀ OFFLINE ===== -->
+      <div x-show="modalitaOffline" class="bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-200 text-sm px-4 py-2 text-center">
+        Modalità offline &mdash; stai vedendo dati dalla cache locale. Le modifiche saranno sincronizzate al ripristino della connessione.
+      </div>
+
+      <div class="page-body">
 
     <!-- ========== 1. DASHBOARD ========== -->
     <div x-show="vistaCorrente === 'dashboard'" class="page-enter">
@@ -946,8 +1027,9 @@
       </div>
     </div>
 
-  </main>
-  <footer class="text-center text-xs text-gray-400 py-2">Gestione Affitti &amp; Utenze v1.0</footer>
+      </div><!-- /.page-body -->
+      <footer class="text-center text-xs text-gray-400 py-2">Gestione Affitti &amp; Utenze v1.0</footer>
+    </main>
   </div>
   </template>
 </div>
