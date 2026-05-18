@@ -605,23 +605,77 @@ function app() {
         return;
       }
 
-      try {
+      // Bug 3 (DEC-020): catch chain a 4 branch invece di un unico mute-all.
+      // Ogni branch produce: cache persistente (no data loss) + classificazione
+      // visibile all'utente + entry in localStorage.errori per diagnostica.
+      const tentativoUpsert = async () => {
         const { error } = await sb.from('user_data').upsert({
           user_id: this.utente.id,
           data: this.dati,
-          updated_at: ora
+          updated_at: ora,
         });
         if (error) throw error;
+      };
+
+      try {
+        await tentativoUpsert();
         scriviCache();
         this._lastSnapshotData = JSON.parse(JSON.stringify(this.dati));
         this.modalitaOffline = false;
         this.statoSalvataggio = 'salvato';
-      } catch(e) {
+      } catch (e) {
+        const msg = (e && e.message) || '';
+        const code = (e && (e.code || e.status)) || '';
+        const isAuthExpired = /jwt expired|invalid jwt|token.*expired/i.test(msg) || code === 401 || code === '401';
+        const isRls = /pgrst301|42501|new row violates row-level security|row-level security/i.test(msg) || code === 403 || code === '403';
+        const isNetwork = !navigator.onLine || /failed to fetch|network|networkerror/i.test(msg) || (e && e.name === 'TypeError');
+
+        if (isAuthExpired) {
+          // Branch A: sessione scaduta → refresh + retry una volta.
+          try {
+            const { error: refreshErr } = await sb.auth.refreshSession();
+            if (refreshErr) throw refreshErr;
+            await tentativoUpsert();
+            scriviCache();
+            this._lastSnapshotData = JSON.parse(JSON.stringify(this.dati));
+            this.modalitaOffline = false;
+            this.statoSalvataggio = 'salvato';
+            return;
+          } catch (retryErr) {
+            scriviCache();
+            this.statoSalvataggio = 'errore';
+            this.mostraToast('warn', 'Sessione scaduta. Esegui di nuovo il login per sincronizzare.');
+            this.pushErrore({ message: 'auth-expired: ' + ((retryErr && retryErr.message) || msg), severity: 'error' });
+            return;
+          }
+        }
+
+        if (isRls) {
+          // Branch B: errore di permessi (RLS) → non riproponibile, log + toast.
+          scriviCache();
+          this.statoSalvataggio = 'errore';
+          this.mostraToast('error', 'Errore di permessi durante il salvataggio.');
+          this.pushErrore({ message: 'rls: ' + msg, severity: 'error' });
+          return;
+        }
+
+        if (isNetwork) {
+          // Branch C: rete giu → modalita offline, cache vale come source.
+          scriviCache();
+          this.modalitaOffline = true;
+          this.statoSalvataggio = 'offline';
+          this.mostraToast('warn', 'Connessione assente — modifiche salvate localmente.');
+          this.pushErrore({ message: 'network: ' + msg, severity: 'warn' });
+          return;
+        }
+
+        // Branch D: generico → cache + toast + log.
         console.error('Errore salvataggio:', e);
-        // Rete/RLS ko: comunque persisti in cache per non perdere le modifiche.
         scriviCache();
         this.modalitaOffline = true;
         this.statoSalvataggio = 'offline';
+        this.mostraToast('error', 'Errore inatteso durante il salvataggio.');
+        this.pushErrore({ message: 'save: ' + msg, severity: 'error' });
       }
     },
 
