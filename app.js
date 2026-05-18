@@ -220,6 +220,75 @@ function app() {
       return arr.filter(x => !x.deletedAt);
     },
 
+    // --- Cestino ---
+    /** Lista unificata di item soft-deleted (proprieta + incassi) per il Cestino. */
+    cestinoItems() {
+      const out = [];
+      const props = Array.isArray(this.dati.proprieta) ? this.dati.proprieta : [];
+      const incs = Array.isArray(this.dati.incassiAffitti) ? this.dati.incassiAffitti : [];
+      for (const p of props) {
+        if (p.deletedAt) out.push({ id: p.id, tipo: 'Proprieta', nome: p.nome || '(senza nome)', deletedAt: p.deletedAt });
+      }
+      for (const i of incs) {
+        if (i.deletedAt) {
+          const propNome = this.nomeProprieta(i.proprietaId);
+          const label = (i.mese || '') + ' - ' + propNome;
+          out.push({ id: i.id, tipo: 'Incasso', nome: label, deletedAt: i.deletedAt });
+        }
+      }
+      return out.sort((a, b) => b.deletedAt.localeCompare(a.deletedAt));
+    },
+    relativeTime(iso) {
+      if (!iso) return '';
+      const diff = Date.now() - new Date(iso).getTime();
+      const m = Math.floor(diff / 60000);
+      if (m < 1) return 'pochi secondi fa';
+      if (m < 60) return m + (m === 1 ? ' minuto fa' : ' minuti fa');
+      const h = Math.floor(m / 60);
+      if (h < 24) return h + (h === 1 ? ' ora fa' : ' ore fa');
+      const g = Math.floor(h / 24);
+      return g + (g === 1 ? ' giorno fa' : ' giorni fa');
+    },
+    ripristina(item) {
+      if (item.tipo === 'Proprieta') {
+        const p = this.dati.proprieta.find(x => x.id === item.id);
+        if (!p) return;
+        const stamp = p.deletedAt;
+        p.deletedAt = null;
+        // Cascading: ripristina solo gli incassi cancellati nello STESSO burst
+        // (timestamp identico). Incassi cancellati separatamente restano in cestino.
+        for (const i of this.dati.incassiAffitti) {
+          if (i.proprietaId === item.id && i.deletedAt === stamp) i.deletedAt = null;
+        }
+      } else {
+        const i = this.dati.incassiAffitti.find(x => x.id === item.id);
+        if (i) i.deletedAt = null;
+      }
+      this.salva();
+    },
+    eliminaDefinitivamente(item) {
+      if (!confirm('Eliminare definitivamente "' + (item.nome || '') + '"? L\'azione non e reversibile.')) return;
+      if (item.tipo === 'Proprieta') {
+        // Cascading hard-delete sugli incassi figli (anche quelli soft-deleted
+        // separatamente). Orfani sono peggio della perdita.
+        this.dati.proprieta = this.dati.proprieta.filter(p => p.id !== item.id);
+        this.dati.incassiAffitti = this.dati.incassiAffitti.filter(i => i.proprietaId !== item.id);
+      } else {
+        this.dati.incassiAffitti = this.dati.incassiAffitti.filter(i => i.id !== item.id);
+      }
+      this.salva();
+    },
+    svuotaCestino() {
+      const items = this.cestinoItems();
+      if (items.length === 0) return;
+      if (!confirm('Svuotare il cestino? ' + items.length + ' elementi saranno eliminati definitivamente.')) return;
+      // Identifica le proprieta cestinate per fare cascading hard-delete dei loro incassi.
+      const propIdsCestinate = this.dati.proprieta.filter(p => p.deletedAt).map(p => p.id);
+      this.dati.proprieta = this.dati.proprieta.filter(p => !p.deletedAt);
+      this.dati.incassiAffitti = this.dati.incassiAffitti.filter(i => !i.deletedAt && !propIdsCestinate.includes(i.proprietaId));
+      this.salva();
+    },
+
     // --- Toast generico (warn/info/success/error) — slot singolo, replace-on-new ---
     toast: { active: false, type: 'info', message: '', timerId: null },
     mostraToast(type, message, durata = 4000) {

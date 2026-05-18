@@ -1147,6 +1147,53 @@
         </div>
       </div>
 
+      <!-- Cestino (PR1 — Data Safety Net) -->
+      <div class="mb-8 settings-section glass-card" data-testid="cestino-section">
+        <div class="settings-head flex items-center justify-between mb-3">
+          <h3 class="font-bold">Cestino</h3>
+          <button type="button"
+                  @click="svuotaCestino()"
+                  x-show="cestinoItems().length > 0"
+                  class="text-xs text-red-500 hover:text-red-700">Svuota cestino</button>
+        </div>
+        <template x-if="cestinoItems().length === 0">
+          <p class="italic text-sm text-gray-500">Il cestino e vuoto.</p>
+        </template>
+        <template x-if="cestinoItems().length > 0">
+          <div class="overflow-x-auto">
+            <table class="glass-table w-full text-sm">
+              <thead>
+                <tr class="text-left">
+                  <th class="py-2">Nome</th>
+                  <th class="py-2">Tipo</th>
+                  <th class="py-2">Eliminato</th>
+                  <th class="py-2 text-right">Azioni</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="item in cestinoItems()" :key="item.tipo + '-' + item.id">
+                  <tr :data-testid="'cestino-row-' + item.id" class="border-t border-gray-200/40">
+                    <td class="py-2" x-text="item.nome"></td>
+                    <td class="py-2" x-text="item.tipo"></td>
+                    <td class="py-2 text-xs text-gray-500" x-text="relativeTime(item.deletedAt)"></td>
+                    <td class="py-2 text-right whitespace-nowrap">
+                      <button type="button"
+                              :data-testid="'cestino-restore-' + item.id"
+                              @click="ripristina(item)"
+                              class="text-xs px-2 py-1 bg-primary-500 hover:bg-primary-600 text-white rounded">Ripristina</button>
+                      <button type="button"
+                              :data-testid="'cestino-hard-' + item.id"
+                              @click="eliminaDefinitivamente(item)"
+                              class="text-xs px-2 py-1 text-red-600 hover:text-red-800 ml-1">Elimina definitivamente</button>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </template>
+      </div>
+
       <!-- Gestione Banche -->
       <div class="settings-section glass-card" data-testid="bank-section">
         <div class="settings-head flex items-center justify-between mb-3">
