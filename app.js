@@ -604,6 +604,7 @@ function app() {
     // --- Persistenza su Supabase ---
     async caricaDatiUtente() {
       this.statoSalvataggio = 'salvataggio';
+      let _primingDone = false;
       try {
         const { data, error } = await sb.from('user_data')
           .select('data, updated_at').eq('user_id', this.utente.id).maybeSingle();
@@ -630,6 +631,7 @@ function app() {
           // Cache locale vince: ripushiamo su Supabase senza sovrascriverla.
           this.dati = migraDati(cacheLocale.data);
           this._lastSnapshotData = JSON.parse(JSON.stringify(this.dati));
+          _primingDone = true;
           this.modalitaOffline = false;
           this.generaIncassiAttesi();
           this.resetFormUtenza();
@@ -653,6 +655,7 @@ function app() {
           await this.salvaSubito();
         }
         this._lastSnapshotData = JSON.parse(JSON.stringify(this.dati));
+        _primingDone = true;
         this.generaIncassiAttesi();
         this.resetFormUtenza();
         this.statoSalvataggio = 'salvato';
@@ -676,6 +679,16 @@ function app() {
           console.error('Errore lettura cache offline:', cacheErr);
         }
         this.statoSalvataggio = 'errore';
+      } finally {
+        // Boot/login priming per snapshot ring: garantisce che la PRIMA salva()
+        // successiva abbia un riferimento pre-mutation valido (vedi salva()
+        // commento). Idempotente: gia' impostato dai rami felici, ri-eseguito
+        // solo se il catch e' caduto senza primare.
+        if (!_primingDone && !this._lastSnapshotData) {
+          try {
+            this._lastSnapshotData = JSON.parse(JSON.stringify(this.dati));
+          } catch (_) {}
+        }
       }
     },
 
