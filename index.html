@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Gestione Affitti &amp; Utenze</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <!-- Tailwind CSS via CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Supabase JS client (auth + DB) -->
@@ -20,9 +23,9 @@
   </script>
   <script>
     tailwind.config = {
-      darkMode: 'media',
       theme: {
         extend: {
+          screens: { lg: '900px' },
           colors: {
             primary: { 50:'#eff6ff',100:'#dbeafe',200:'#bfdbfe',300:'#93c5fd',400:'#60a5fa',500:'#3b82f6',600:'#2563eb',700:'#1d4ed8',800:'#1e40af',900:'#1e3a8a' }
           }
@@ -31,6 +34,84 @@
     }
   </script>
   <style>
+    :root {
+      /* ===== Surface ===== */
+      --bg-base: #f5f5f7;
+      --surface: rgba(255, 255, 255, 0.55);
+      --surface-solid: #ffffff;
+      --surface-elevated: rgba(255, 255, 255, 0.7);
+      --sidebar-bg: rgba(246, 246, 248, 0.4);
+      --topbar-bg: rgba(248, 248, 250, 0.5);
+
+      /* ===== Strokes ===== */
+      --border: rgba(0, 0, 0, 0.08);
+      --border-strong: rgba(0, 0, 0, 0.12);
+      --divider: rgba(0, 0, 0, 0.06);
+
+      /* ===== Text ===== */
+      --text-primary: #1d1d1f;
+      --text-secondary: #6e6e73;
+      --text-tertiary: #86868b;
+      --text-quaternary: #aeaeb2;
+
+      /* ===== Accent (Apple blue) ===== */
+      --accent: #0071e3;
+      --accent-hover: #0077ed;
+      --accent-soft: rgba(0, 113, 227, 0.08);
+      --accent-ring: rgba(0, 113, 227, 0.4);
+
+      /* ===== Status (iOS system) ===== */
+      --green: #34c759;       --green-soft: rgba(52, 199, 89, 0.12);
+      --amber: #ff9f0a;       --amber-soft: rgba(255, 159, 10, 0.14);
+      --red:   #ff3b30;       --red-soft:   rgba(255, 59, 48, 0.12);
+      --purple:#af52de;       --purple-soft:rgba(175, 82, 222, 0.12);
+      --teal:  #5ac8fa;       --teal-soft:  rgba(90, 200, 250, 0.14);
+
+      /* ===== Utenze + gradients ===== */
+      --utenza-acqua: #5ac8fa;
+      --utenza-gas:   #ff9f0a;
+      --utenza-luce:  #ffcc00;
+      --gradient-logo:   linear-gradient(135deg, #0071e3, #5e9eff);
+      --gradient-avatar: linear-gradient(135deg, #ff9f0a, #ff3b30);
+
+      /* ===== Radius ===== */
+      --r-xs: 6px; --r-sm: 8px; --r-md: 12px; --r-lg: 16px; --r-xl: 22px; --r-pill: 999px;
+      --r-button: 7px;
+
+      /* ===== Shadow ===== */
+      --shadow-xs: 0 1px 2px rgba(0,0,0,0.04);
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.04), 0 0 0 0.5px rgba(0,0,0,0.04);
+      --shadow-md: 0 6px 24px -8px rgba(0,0,0,0.10), 0 1px 3px rgba(0,0,0,0.04);
+      --shadow-lg: 0 20px 50px -20px rgba(0,0,0,0.18), 0 4px 12px rgba(0,0,0,0.05);
+      --shadow-window: 0 30px 80px -30px rgba(0,0,0,0.30), 0 8px 24px rgba(0,0,0,0.08);
+
+      /* ===== Backdrop blur ===== */
+      --blur-card:     blur(20px) saturate(180%);
+      --blur-shell:    blur(60px) saturate(200%);
+      --blur-chrome:   blur(30px) saturate(200%);
+      --blur-modal:    blur(50px) saturate(200%);
+      --blur-backdrop: blur(6px);
+
+      /* ===== Typography ===== */
+      --font-display: 'Inter Tight', -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+      --font-text:    'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+      --font-mono:    'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
+
+      /* ===== Motion ===== */
+      --ease-out-apple: cubic-bezier(0.2, 0.8, 0.2, 1);
+      --dur-fast: 120ms; --dur-md: 220ms; --dur-slow: 400ms;
+
+      /* ===== Z-index ===== */
+      --z-base: 0; --z-content: 1;
+      --z-sidebar: 30; --z-topbar: 31;
+      --z-drawer-backdrop: 40; --z-drawer: 41;
+      --z-modal-backdrop: 50; --z-modal: 51;
+      --z-toast: 60;
+
+      /* ===== Drawer ===== */
+      --drawer-width: 280px;
+      --drawer-duration: 220ms;
+    }
     [x-cloak] { display: none !important; }
     html, body { overflow-x: hidden; }
     ::-webkit-scrollbar { width: 6px; height: 6px; }
