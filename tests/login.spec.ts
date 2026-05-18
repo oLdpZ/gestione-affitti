@@ -13,8 +13,9 @@ test.describe('login', () => {
     await page.fill('input[type="password"]', process.env.TEST_PASSWORD!);
     await page.click('button[type="submit"]');
 
-    // 'Dashboard' compare in 3 punti (2 button nav + 1 h2). Heading per evitare strict.
-    await expect(page.getByRole('heading', { name: /Dashboard/ })).toBeVisible({
+    // 'Dashboard' compare in 3 punti (2 button nav + h1 dash-h1 + legacy h2).
+    // PR0: scope to level 1 to target the new <h1 class="dash-h1">Dashboard</h1>.
+    await expect(page.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible({
       timeout: 15_000,
     });
     // Status dot esiste due volte (desktop + sm:hidden mobile). first() per non strict.
