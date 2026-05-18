@@ -120,6 +120,7 @@ function app() {
     authInfo: '',
     authLoading: false,
     debounceTimer: null,
+    _lastSnapshotData: null,
     proprietaSelezionata: null,
     annoProprieta: new Date().getFullYear(),
     meseCalendario: new Date().getMonth(),
@@ -278,6 +279,64 @@ function app() {
       }
       this.salva();
     },
+    // --- Snapshot ring buffer (10 stati pre-mutation) ---
+    pushSnapshot(preState) {
+      if (!preState) return;
+      try {
+        const raw = localStorage.getItem('gestione_affitti_snapshots');
+        const arr = raw ? JSON.parse(raw) : [];
+        const lista = Array.isArray(arr) ? arr : [];
+        lista.push({ ts: new Date().toISOString(), dati: preState });
+        while (lista.length > 10) lista.shift();
+        localStorage.setItem('gestione_affitti_snapshots', JSON.stringify(lista));
+      } catch (e) {
+        // QuotaExceededError o JSON troppo grande: log non-fatale.
+        this.pushErrore({ message: 'pushSnapshot: ' + (e && e.message), severity: 'warn' });
+      }
+    },
+    snapshots() {
+      try {
+        const raw = localStorage.getItem('gestione_affitti_snapshots');
+        const arr = raw ? JSON.parse(raw) : [];
+        return Array.isArray(arr) ? arr.slice().reverse() : [];
+      } catch (_) { return []; }
+    },
+    snapshotDiff(snap) {
+      const safeLen = (arr) => Array.isArray(arr) ? arr.filter(x => !x.deletedAt).length : 0;
+      const curr = {
+        proprieta: safeLen(this.dati.proprieta),
+        incassiAffitti: safeLen(this.dati.incassiAffitti),
+        utenze: safeLen(this.dati.utenze),
+      };
+      const past = snap && snap.dati ? {
+        proprieta: safeLen(snap.dati.proprieta),
+        incassiAffitti: safeLen(snap.dati.incassiAffitti),
+        utenze: safeLen(snap.dati.utenze),
+      } : { proprieta: 0, incassiAffitti: 0, utenze: 0 };
+      return {
+        proprieta: past.proprieta - curr.proprieta,
+        incassiAffitti: past.incassiAffitti - curr.incassiAffitti,
+        utenze: past.utenze - curr.utenze,
+      };
+    },
+    formatDiff(d) {
+      const parts = [];
+      for (const k of ['proprieta', 'incassiAffitti', 'utenze']) {
+        const v = d[k] || 0;
+        const sign = v > 0 ? '+' : '';
+        const lbl = k === 'incassiAffitti' ? 'Incassi' : (k === 'proprieta' ? 'Proprieta' : 'Utenze');
+        parts.push(lbl + ' ' + sign + v);
+      }
+      return parts.join(', ');
+    },
+    ripristinaSnapshot(snap) {
+      if (!snap || !snap.dati) return;
+      if (!confirm('Ripristinare lo snapshot del ' + new Date(snap.ts).toLocaleString('it-IT') + '?\n\nLo stato attuale sara sovrascritto, INCLUSO il cestino.')) return;
+      this.dati = migraDati(JSON.parse(JSON.stringify(snap.dati)));
+      this._lastSnapshotData = JSON.parse(JSON.stringify(this.dati));
+      this.salva();
+    },
+
     svuotaCestino() {
       const items = this.cestinoItems();
       if (items.length === 0) return;
@@ -448,6 +507,7 @@ function app() {
         if (cacheEPiuRecente) {
           // Cache locale vince: ripushiamo su Supabase senza sovrascriverla.
           this.dati = migraDati(cacheLocale.data);
+          this._lastSnapshotData = JSON.parse(JSON.stringify(this.dati));
           this.modalitaOffline = false;
           this.generaIncassiAttesi();
           this.resetFormUtenza();
@@ -470,6 +530,7 @@ function app() {
           this.modalitaOffline = false;
           await this.salvaSubito();
         }
+        this._lastSnapshotData = JSON.parse(JSON.stringify(this.dati));
         this.generaIncassiAttesi();
         this.resetFormUtenza();
         this.statoSalvataggio = 'salvato';
@@ -516,6 +577,12 @@ function app() {
     /** Salvataggio immediato su Supabase (upsert) */
     async salvaSubito() {
       if (!this.utente) return;
+      // Snapshot pre-mutation: pushiamo lo stato PRECEDENTE a questo save
+      // (catturato all'ultimo save riuscito o al load). Garantisce che la
+      // timeline rifletta gli stati osservabili dall'utente, non i debounce.
+      if (this._lastSnapshotData) {
+        this.pushSnapshot(this._lastSnapshotData);
+      }
       const ora = new Date().toISOString();
       // Aggiorna sempre la cache locale PRIMA dell'upsert: cosi se la rete
       // cade a meta operazione le modifiche non vanno perse.
@@ -546,6 +613,7 @@ function app() {
         });
         if (error) throw error;
         scriviCache();
+        this._lastSnapshotData = JSON.parse(JSON.stringify(this.dati));
         this.modalitaOffline = false;
         this.statoSalvataggio = 'salvato';
       } catch(e) {

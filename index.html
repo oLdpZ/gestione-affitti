@@ -1194,6 +1194,29 @@
         </template>
       </div>
 
+      <!-- Ripristina snapshot (PR1 — ring buffer di 10 stati pre-mutation) -->
+      <div class="mb-8 settings-section glass-card" data-testid="snapshot-section">
+        <h3 class="font-bold mb-3">Ripristina snapshot</h3>
+        <template x-if="snapshots().length === 0">
+          <p class="italic text-sm text-gray-500">Nessuno snapshot disponibile. Verra creato al primo salvataggio.</p>
+        </template>
+        <template x-if="snapshots().length > 0">
+          <ul class="divide-y divide-gray-200/40">
+            <template x-for="snap in snapshots()" :key="snap.ts">
+              <li :data-testid="'snapshot-row-' + snap.ts" class="flex items-center justify-between py-2 text-sm">
+                <div>
+                  <div class="font-mono text-xs text-gray-500" x-text="new Date(snap.ts).toLocaleString('it-IT')"></div>
+                  <div class="text-xs text-gray-400" x-text="formatDiff(snapshotDiff(snap))"></div>
+                </div>
+                <button type="button"
+                        @click="ripristinaSnapshot(snap)"
+                        class="text-xs px-2 py-1 bg-primary-500 hover:bg-primary-600 text-white rounded">Ripristina</button>
+              </li>
+            </template>
+          </ul>
+        </template>
+      </div>
+
       <!-- Gestione Banche -->
       <div class="settings-section glass-card" data-testid="bank-section">
         <div class="settings-head flex items-center justify-between mb-3">
