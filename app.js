@@ -1,3 +1,7 @@
+// Numero WhatsApp per "Invia diagnostica" — vuoto = bottone disabilitato.
+// Configurato dall'utente; non commitare mai un numero reale qui.
+const SUPPORT_WHATSAPP = '';
+
 /** Genera un ID univoco breve */
 function uid() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 6); }
 
@@ -192,6 +196,26 @@ function app() {
       if (!Array.isArray(arr)) return [];
       return arr.filter(x => !x.deletedAt);
     },
+
+    // --- Toast generico (warn/info/success/error) — slot singolo, replace-on-new ---
+    toast: { active: false, type: 'info', message: '', timerId: null },
+    mostraToast(type, message, durata = 4000) {
+      if (this.toast.timerId) clearTimeout(this.toast.timerId);
+      this.toast.active = true;
+      this.toast.type = type;
+      this.toast.message = message;
+      this.toast.timerId = setTimeout(() => {
+        this.toast.active = false;
+        this.toast.timerId = null;
+      }, durata);
+    },
+    dismissGenericToast() {
+      if (this.toast.timerId) clearTimeout(this.toast.timerId);
+      this.toast.active = false;
+      this.toast.timerId = null;
+    },
+
+    supportWhatsapp: SUPPORT_WHATSAPP,
 
     // --- Autenticazione ---
     async eseguiLogin() {
