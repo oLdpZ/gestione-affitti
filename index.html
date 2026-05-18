@@ -787,22 +787,24 @@
     <div x-show="vistaCorrente === 'proprieta'" class="page-enter">
       <template x-if="!proprietaSelezionata">
         <div>
-          <h2 class="text-lg font-bold mb-4">Proprieta</h2>
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            <template x-for="p in dati.proprieta" :key="p.id">
-              <div @click="apriProprieta(p.id)"
-                   class="glass-card bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 cursor-pointer hover:shadow-md transition-shadow">
-                <h3 class="font-semibold" x-text="p.nome"></h3>
-                <div class="text-xs text-gray-500 mt-1" x-text="formatValuta(p.importoAffittoMensile, p.currency) + '/mese — ' + p.intestatario"></div>
-              </div>
+          <div class="prop-grid">
+            <template x-for="(p, idx) in dati.proprieta" :key="p.id">
+              <button type="button" class="glass-card prop-card" @click="apriProprieta(p.id)">
+                <div class="prop-banner" :style="'background: var(--banner-' + ((idx % 9) + 1) + ');'"></div>
+                <div class="prop-body">
+                  <div class="prop-name" x-text="p.nome"></div>
+                  <div class="prop-meta" x-text="p.intestatario + ' — ' + (nomeBanca(p.bancaIncasso) || '—')"></div>
+                  <div class="prop-importo tnum" x-text="formatValuta(p.importoAffittoMensile, p.currency) + '/mese'"></div>
+                </div>
+              </button>
             </template>
           </div>
         </div>
       </template>
       <template x-if="proprietaSelezionata">
         <div>
-          <button @click="proprietaSelezionata = null" class="text-sm text-primary-600 dark:text-primary-400 mb-3 hover:underline">&larr; Tutte le proprieta</button>
-          <div class="glass-card bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 mb-4">
+          <button @click="proprietaSelezionata = null" class="btn-ghost mb-3">&larr; Tutte le proprieta</button>
+          <div class="glass-card" style="padding:18px;margin-bottom:16px;">
             <h2 class="text-lg font-bold" x-text="getProprieta(proprietaSelezionata).nome"></h2>
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mt-2 text-xs">
               <div>Tipo: <span class="font-medium" x-text="getProprieta(proprietaSelezionata).tipo"></span></div>
@@ -812,12 +814,12 @@
             </div>
           </div>
           <!-- Filtro anno -->
-          <div class="flex flex-wrap items-center gap-2 mb-3">
-            <label class="text-sm font-semibold">Anno:</label>
-            <select x-model.number="annoProprieta" class="text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600">
+          <div class="filter-row" style="align-items:center;">
+            <label class="text-sm font-semibold" style="align-self:center;">Anno:</label>
+            <select x-model.number="annoProprieta">
               <template x-for="a in anniDisponibili()" :key="a"><option :value="a" x-text="a"></option></template>
             </select>
-            <span class="text-sm sm:ml-4 inline-flex flex-wrap gap-2 items-baseline">Totale incassi anno:
+            <span class="text-sm inline-flex flex-wrap gap-2 items-baseline" style="align-self:center;margin-left:8px;">Totale incassi anno:
               <template x-for="cur in ['EUR','USD']" :key="cur">
                 <strong x-show="totaleIncassiAnno(proprietaSelezionata, annoProprieta)[cur] > 0" class="text-green-600 dark:text-green-400" x-text="formatValuta(totaleIncassiAnno(proprietaSelezionata, annoProprieta)[cur], cur)"></strong>
               </template>
@@ -825,51 +827,55 @@
             </span>
           </div>
           <!-- Storico incassi -->
-          <h3 class="text-sm font-bold mb-2">Storico Incassi</h3>
-          <div class="overflow-x-auto mb-6">
-            <table class="w-full table-dense bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-              <thead class="bg-gray-50 dark:bg-gray-750"><tr>
-                <th class="text-left">Mese</th><th class="text-left">Data prevista</th><th class="text-left">Data incasso</th>
-                <th class="text-right">Importo</th><th class="text-left">Banca</th><th class="text-left">Girato</th><th class="text-left">Note</th>
-              </tr></thead>
-              <tbody>
-                <template x-for="inc in storicoIncassiProprieta(proprietaSelezionata, annoProprieta)" :key="inc.id">
-                  <tr class="border-t border-gray-100 dark:border-gray-700">
-                    <td x-text="inc.mese"></td><td x-text="formatData(inc.dataPrevista)"></td>
-                    <td x-text="inc.dataIncasso ? formatData(inc.dataIncasso) : '—'"></td>
-                    <td class="text-right" x-text="formatValuta(inc.importo, inc.currency)"></td>
-                    <td x-text="nomeBanca(inc.bancaId) || '—'"></td>
-                    <td x-text="inc.girato ? formatData(inc.dataGiro) : '—'"></td>
-                    <td x-text="inc.note || ''"></td>
-                  </tr>
-                </template>
-              </tbody>
-            </table>
+          <div class="glass-card" style="padding:14px;margin-bottom:16px;">
+            <h3 class="text-sm font-bold mb-2">Storico Incassi</h3>
+            <div class="overflow-x-auto">
+              <table class="glass-table">
+                <thead><tr>
+                  <th>Mese</th><th>Data prevista</th><th>Data incasso</th>
+                  <th class="text-right">Importo</th><th>Banca</th><th>Girato</th><th>Note</th>
+                </tr></thead>
+                <tbody>
+                  <template x-for="inc in storicoIncassiProprieta(proprietaSelezionata, annoProprieta)" :key="inc.id">
+                    <tr>
+                      <td x-text="inc.mese"></td><td x-text="formatData(inc.dataPrevista)"></td>
+                      <td x-text="inc.dataIncasso ? formatData(inc.dataIncasso) : '—'"></td>
+                      <td class="text-right" x-text="formatValuta(inc.importo, inc.currency)"></td>
+                      <td x-text="nomeBanca(inc.bancaId) || '—'"></td>
+                      <td x-text="inc.girato ? formatData(inc.dataGiro) : '—'"></td>
+                      <td x-text="inc.note || ''"></td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
           </div>
           <!-- Storico utenze -->
-          <h3 class="text-sm font-bold mb-2">Storico Utenze</h3>
-          <div class="overflow-x-auto">
-            <table class="w-full table-dense bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-              <thead class="bg-gray-50 dark:bg-gray-750"><tr>
-                <th class="text-left">Tipo</th><th class="text-left">Fornitore</th><th class="text-left">Periodo</th>
-                <th class="text-left">Scadenza</th><th class="text-right">Importo</th><th class="text-left">Stato</th>
-              </tr></thead>
-              <tbody>
-                <template x-for="u in storicoUtenzeProprieta(proprietaSelezionata, annoProprieta)" :key="u.id">
-                  <tr class="border-t border-gray-100 dark:border-gray-700">
-                    <td x-text="u.tipo"></td><td x-text="u.fornitore || '—'"></td>
-                    <td x-text="u.periodoRiferimento"></td><td x-text="formatData(u.dataScadenza)"></td>
-                    <td class="text-right" x-text="formatValuta(u.importo, u.currency)"></td><td x-html="badgeStatoUtenza(u.stato)"></td>
-                  </tr>
-                </template>
-              </tbody>
-            </table>
-          </div>
-          <div class="mt-2 text-sm flex flex-wrap gap-2 items-baseline">Totale utenze anno:
-            <template x-for="cur in ['EUR','USD']" :key="cur">
-              <strong x-show="totaleUtenzeAnno(proprietaSelezionata, annoProprieta)[cur] > 0" x-text="formatValuta(totaleUtenzeAnno(proprietaSelezionata, annoProprieta)[cur], cur)"></strong>
-            </template>
-            <strong x-show="totaleUtenzeAnno(proprietaSelezionata, annoProprieta).EUR === 0 && totaleUtenzeAnno(proprietaSelezionata, annoProprieta).USD === 0" x-text="formatValuta(0, getProprieta(proprietaSelezionata).currency)"></strong>
+          <div class="glass-card" style="padding:14px;">
+            <h3 class="text-sm font-bold mb-2">Storico Utenze</h3>
+            <div class="overflow-x-auto">
+              <table class="glass-table">
+                <thead><tr>
+                  <th>Tipo</th><th>Fornitore</th><th>Periodo</th>
+                  <th>Scadenza</th><th class="text-right">Importo</th><th>Stato</th>
+                </tr></thead>
+                <tbody>
+                  <template x-for="u in storicoUtenzeProprieta(proprietaSelezionata, annoProprieta)" :key="u.id">
+                    <tr>
+                      <td x-text="u.tipo"></td><td x-text="u.fornitore || '—'"></td>
+                      <td x-text="u.periodoRiferimento"></td><td x-text="formatData(u.dataScadenza)"></td>
+                      <td class="text-right" x-text="formatValuta(u.importo, u.currency)"></td><td x-html="badgeStatoUtenza(u.stato)"></td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+            <div class="mt-2 text-sm flex flex-wrap gap-2 items-baseline">Totale utenze anno:
+              <template x-for="cur in ['EUR','USD']" :key="cur">
+                <strong x-show="totaleUtenzeAnno(proprietaSelezionata, annoProprieta)[cur] > 0" x-text="formatValuta(totaleUtenzeAnno(proprietaSelezionata, annoProprieta)[cur], cur)"></strong>
+              </template>
+              <strong x-show="totaleUtenzeAnno(proprietaSelezionata, annoProprieta).EUR === 0 && totaleUtenzeAnno(proprietaSelezionata, annoProprieta).USD === 0" x-text="formatValuta(0, getProprieta(proprietaSelezionata).currency)"></strong>
+            </div>
           </div>
         </div>
       </template>
