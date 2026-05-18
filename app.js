@@ -240,10 +240,34 @@ function app() {
 
     supportWhatsapp: SUPPORT_WHATSAPP,
 
-    // Stub: l'impl reale arriva con T13. Mantenuto qui perche eliminaIncasso/
-    // eliminaProprieta lo chiamano e devono essere safe se l'utente clicca
-    // prima che l'UI del toast sia mounted (boot race).
-    mostraUndoToast(_message, _undoFn) { /* no-op stub, replaced in T13 */ },
+    // --- Undo toast (5s, stack model: il nuovo rimpiazza il precedente) ---
+    undoToast: { active: false, message: '', undoFn: null, timerId: null, expiresAt: 0 },
+    mostraUndoToast(message, undoFn) {
+      if (this.undoToast.timerId) clearTimeout(this.undoToast.timerId);
+      this.undoToast.active = true;
+      this.undoToast.message = message;
+      this.undoToast.undoFn = typeof undoFn === 'function' ? undoFn : null;
+      this.undoToast.expiresAt = Date.now() + 5000;
+      this.undoToast.timerId = setTimeout(() => {
+        this.undoToast.active = false;
+        this.undoToast.undoFn = null;
+        this.undoToast.timerId = null;
+      }, 5000);
+    },
+    eseguiUndo() {
+      const fn = this.undoToast.undoFn;
+      if (this.undoToast.timerId) clearTimeout(this.undoToast.timerId);
+      this.undoToast.active = false;
+      this.undoToast.undoFn = null;
+      this.undoToast.timerId = null;
+      if (fn) try { fn(); } catch (e) { this.pushErrore({ message: 'undo: ' + (e && e.message), severity: 'error' }); }
+    },
+    dismissToast() {
+      if (this.undoToast.timerId) clearTimeout(this.undoToast.timerId);
+      this.undoToast.active = false;
+      this.undoToast.undoFn = null;
+      this.undoToast.timerId = null;
+    },
 
     /** Aggiunge un'entry al ring buffer FIFO di 50 errori in localStorage.errori.
      *  Mai re-throwa: solo log + storage. Filtra implicitamente i campi: niente PII. */
@@ -785,8 +809,16 @@ function app() {
       this.salva();
     },
     eliminaUtenza(id) {
-      if (!confirm('Eliminare questa utenza?')) return;
-      this.dati.utenze = this.dati.utenze.filter(u => u.id !== id); this.salva();
+      const idx = this.dati.utenze.findIndex(u => u.id === id);
+      if (idx < 0) return;
+      // Utenze non hanno tombstone in PR1: deep-clone + splice, undo pusha indietro.
+      const snap = JSON.parse(JSON.stringify(this.dati.utenze[idx]));
+      this.dati.utenze.splice(idx, 1);
+      this.salva();
+      this.mostraUndoToast('Utenza eliminata', () => {
+        this.dati.utenze.push(snap);
+        this.salva();
+      });
     },
 
     // --- Impostazioni: Proprieta ---
@@ -863,11 +895,18 @@ function app() {
       const nIncassi = this.attivi(this.dati.incassiAffitti).filter(i => i.bancaId === id || i.bancaDestinazioneId === id).length;
       const nProp = this.attivi(this.dati.proprieta).filter(p => p.bancaIncasso === id || p.bancaDestinazione === id).length;
       if (nIncassi + nProp > 0) {
-        alert('Impossibile eliminare: ' + nProp + ' proprietà e ' + nIncassi + ' incassi usano questa banca.');
+        this.mostraToast('warn', 'Impossibile eliminare: ' + nProp + ' proprieta e ' + nIncassi + ' incassi usano questa banca.');
         return;
       }
-      if (!confirm('Eliminare questa banca?')) return;
-      this.dati.banche = this.dati.banche.filter(b => b.id !== id); this.salva();
+      const idx = this.dati.banche.findIndex(b => b.id === id);
+      if (idx < 0) return;
+      const snap = JSON.parse(JSON.stringify(this.dati.banche[idx]));
+      this.dati.banche.splice(idx, 1);
+      this.salva();
+      this.mostraUndoToast('Banca eliminata', () => {
+        this.dati.banche.push(snap);
+        this.salva();
+      });
     },
 
     formatValuta, formatData

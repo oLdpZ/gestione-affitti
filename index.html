@@ -1200,6 +1200,19 @@
     </main>
   </div>
   </template>
+
+  <!-- ===== Undo toast (5s, stack model) ===== -->
+  <div x-show="undoToast.active"
+       x-transition.opacity.duration.200ms
+       class="fixed bottom-6 inset-x-0 mx-auto max-w-md glass-card flex items-center justify-between gap-3 px-4 py-3 z-50 shadow-lg"
+       data-testid="undo-toast"
+       @keydown.escape.window="dismissToast()">
+    <span class="text-sm" x-text="undoToast.message"></span>
+    <button type="button"
+            class="text-sm font-semibold text-primary-600 hover:text-primary-700"
+            data-testid="undo-button"
+            @click="eseguiUndo()">Annulla</button>
+  </div>
 </div>
 
 <!-- ============================================================
