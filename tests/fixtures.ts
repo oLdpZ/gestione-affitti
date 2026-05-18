@@ -114,7 +114,7 @@ export async function doLogin(page: import('@playwright/test').Page): Promise<vo
   await page.click('button[type="submit"]');
   // Heading h2 "Dashboard — <mese>" e' unico (i 2 button nav contengono pure
   // 'Dashboard' ma sono <button>, qui filtriamo per ruolo heading).
-  await page.getByRole('heading', { name: /Dashboard/ }).waitFor({ timeout: 15_000 });
+  await page.getByRole('heading', { level: 1, name: 'Dashboard' }).waitFor({ timeout: 15_000 });
 }
 
 type Fixtures = {
