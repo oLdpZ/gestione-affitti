@@ -1217,6 +1217,64 @@
         </template>
       </div>
 
+      <!-- Salute dati (PR1 — counts, sync, storage, errori, diagnostica) -->
+      <div class="mb-8 settings-section glass-card" data-testid="salute-dati-section">
+        <h3 class="font-bold mb-3">Salute dati</h3>
+        <dl class="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+          <dt class="text-gray-500">Proprieta attive</dt>
+          <dd x-text="saluteDati().proprietaAttive" data-testid="sd-prop-attive"></dd>
+          <dt class="text-gray-500">Proprieta cestinate</dt>
+          <dd x-text="saluteDati().proprietaCestinate" data-testid="sd-prop-cestinate"></dd>
+          <dt class="text-gray-500">Incassi attivi</dt>
+          <dd x-text="saluteDati().incassiAttivi" data-testid="sd-inc-attivi"></dd>
+          <dt class="text-gray-500">Incassi cestinati</dt>
+          <dd x-text="saluteDati().incassiCestinati"></dd>
+          <dt class="text-gray-500">Incassi orfani</dt>
+          <dd x-text="saluteDati().incassiOrfani"></dd>
+          <dt class="text-gray-500">Incassi importo=0</dt>
+          <dd x-text="saluteDati().incassiZero"></dd>
+          <dt class="text-gray-500">Utenze importo=0</dt>
+          <dd x-text="saluteDati().utenzeZero"></dd>
+          <dt class="text-gray-500">Ultimo sync</dt>
+          <dd x-text="saluteDati().ultimoSync || '—'"></dd>
+          <dt class="text-gray-500">Dimensione dati</dt>
+          <dd><span x-text="saluteDati().dimensioneBlobKB" data-testid="sd-blob-kb"></span> KB</dd>
+          <dt class="text-gray-500">Storage browser</dt>
+          <dd><span x-text="storagePctValue !== null ? storagePctValue + '%' : '—'"></span></dd>
+        </dl>
+
+        <details class="mt-4">
+          <summary class="cursor-pointer text-sm">Ultimi errori (<span x-text="errori().length"></span>)</summary>
+          <ul class="mt-2 text-xs max-h-40 overflow-y-auto">
+            <template x-for="(e, idx) in errori().slice().reverse()" :key="idx">
+              <li class="border-b border-gray-200/40 py-1">
+                <span class="font-mono text-gray-500" x-text="e.ts"></span>
+                <span class="ml-1" x-text="e.message"></span>
+              </li>
+            </template>
+            <template x-if="errori().length === 0">
+              <li class="italic text-gray-500 py-1">Nessun errore registrato.</li>
+            </template>
+          </ul>
+        </details>
+
+        <div class="mt-4 flex items-center gap-2">
+          <button type="button"
+                  class="text-xs px-3 py-1 bg-primary-500 text-white rounded disabled:opacity-40 disabled:cursor-not-allowed"
+                  data-testid="diagnostica-whatsapp"
+                  :disabled="!supportWhatsapp"
+                  @click="inviaDiagnostica()">Invia diagnostica</button>
+          <template x-if="!supportWhatsapp">
+            <span class="text-xs italic text-gray-500">Numero diagnostica non configurato.</span>
+          </template>
+        </div>
+
+        <div class="mt-4 p-3 rounded border border-dashed border-gray-300 opacity-60">
+          <h4 class="text-sm font-medium">Sezione Sync</h4>
+          <p class="text-xs italic text-gray-500">Coda mutazioni, ultimo flush, conflitti — disponibile dopo PR2b (migrazione schema).</p>
+        </div>
+      </div>
+
       <!-- Gestione Banche -->
       <div class="settings-section glass-card" data-testid="bank-section">
         <div class="settings-head flex items-center justify-between mb-3">

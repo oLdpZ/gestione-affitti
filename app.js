@@ -121,6 +121,7 @@ function app() {
     authLoading: false,
     debounceTimer: null,
     _lastSnapshotData: null,
+    storagePctValue: null,
     proprietaSelezionata: null,
     annoProprieta: new Date().getFullYear(),
     meseCalendario: new Date().getMonth(),
@@ -159,6 +160,8 @@ function app() {
 
       // Pulizia: rimuove chiave localStorage obsoleta e service worker stale da versioni precedenti
       try { localStorage.removeItem('gestione_affitti_dati'); } catch (e) {}
+      // Fire-and-forget: aggiorna la percentuale di storage usato dal browser.
+      this.aggiornaStoragePct();
       if ('serviceWorker' in navigator) {
         try {
           const regs = await navigator.serviceWorker.getRegistrations();
@@ -329,6 +332,70 @@ function app() {
       }
       return parts.join(', ');
     },
+    // --- Salute dati ---
+    saluteDati() {
+      const props = Array.isArray(this.dati.proprieta) ? this.dati.proprieta : [];
+      const incs = Array.isArray(this.dati.incassiAffitti) ? this.dati.incassiAffitti : [];
+      const utz = Array.isArray(this.dati.utenze) ? this.dati.utenze : [];
+      const propAttiveIds = new Set(props.filter(p => !p.deletedAt).map(p => p.id));
+      const incassiAttivi = incs.filter(i => !i.deletedAt);
+      let ultimoSync = null;
+      try {
+        const raw = localStorage.getItem('gestione_affitti_cache');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && parsed.updated_at) {
+            ultimoSync = new Date(parsed.updated_at).toLocaleString('it-IT');
+          }
+        }
+      } catch (_) {}
+      let dimensioneBlobKB = 0;
+      try {
+        dimensioneBlobKB = Math.round((JSON.stringify(this.dati).length / 1024) * 10) / 10;
+      } catch (_) {}
+      return {
+        proprietaAttive: props.filter(p => !p.deletedAt).length,
+        proprietaCestinate: props.filter(p => p.deletedAt).length,
+        incassiAttivi: incassiAttivi.length,
+        incassiCestinati: incs.filter(i => i.deletedAt).length,
+        incassiOrfani: incassiAttivi.filter(i => !propAttiveIds.has(i.proprietaId)).length,
+        incassiZero: incassiAttivi.filter(i => !(i.importo > 0)).length,
+        utenzeZero: utz.filter(u => !(u.importo > 0)).length,
+        ultimoSync,
+        dimensioneBlobKB,
+      };
+    },
+    async aggiornaStoragePct() {
+      try {
+        if (navigator.storage && navigator.storage.estimate) {
+          const est = await navigator.storage.estimate();
+          if (est && est.quota) {
+            this.storagePctValue = Math.round(((est.usage || 0) / est.quota) * 100);
+            return;
+          }
+        }
+        this.storagePctValue = null;
+      } catch (_) {
+        this.storagePctValue = null;
+      }
+    },
+    errori() {
+      try {
+        const raw = localStorage.getItem('errori');
+        const arr = raw ? JSON.parse(raw) : [];
+        return Array.isArray(arr) ? arr : [];
+      } catch (_) { return []; }
+    },
+    inviaDiagnostica() {
+      if (!this.supportWhatsapp) return;
+      const ultimi = this.errori().slice(-50);
+      const lines = ultimi.map(e => '[' + (e.ts || '') + '] ' + (e.message || ''));
+      let body = 'Diagnostica gestione-affitti\n\n' + lines.join('\n');
+      if (body.length > 3500) body = body.slice(-3500);
+      const url = 'https://wa.me/' + encodeURIComponent(this.supportWhatsapp) + '?text=' + encodeURIComponent(body);
+      window.open(url, '_blank', 'noopener,noreferrer');
+    },
+
     ripristinaSnapshot(snap) {
       if (!snap || !snap.dati) return;
       if (!confirm('Ripristinare lo snapshot del ' + new Date(snap.ts).toLocaleString('it-IT') + '?\n\nLo stato attuale sara sovrascritto, INCLUSO il cestino.')) return;
