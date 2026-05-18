@@ -7,7 +7,12 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <!-- Order: Tailwind CDN sync -> Supabase JS sync -> sb init sync -> Tailwind config sync -> Alpine defer -> app.js defer -->
+  <!-- Order: Tailwind CDN sync -> Supabase JS sync -> sb init sync -> Tailwind config sync -> Alpine defer (head) -> app.js classic (body, before </body>).
+       app.js MUST stay classic (no defer): Alpine is defer, deferred scripts
+       run in document order, so a deferred app.js would execute AFTER Alpine
+       and x-data="app()" would resolve to undefined. Classic at the end of
+       body executes synchronously at parse time, defining app() global
+       before Alpine's deferred init fires post-DOMContentLoaded. -->
   <!-- Tailwind CSS via CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Supabase JS client (auth + DB) -->
@@ -1381,6 +1386,6 @@
 <!-- ============================================================
      LOGICA APPLICATIVA
      ============================================================ -->
-<script src="app.js" defer></script>
+<script src="app.js"></script>
 </body>
 </html>
