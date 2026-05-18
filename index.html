@@ -883,27 +883,27 @@
 
     <!-- ========== 4. MOVIMENTI BANCA ========== -->
     <div x-show="vistaCorrente === 'banche'" class="page-enter">
-      <h2 class="text-lg font-bold mb-4">Movimenti Banca</h2>
-      <div class="flex items-center gap-2 mb-4">
-        <label class="text-sm">Mese:</label>
-        <input type="month" x-model="meseBanca" class="text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600">
+      <div class="filter-row" style="align-items:center;margin-bottom:14px;">
+        <label class="text-sm" style="align-self:center;">Mese:</label>
+        <input type="month" x-model="meseBanca">
       </div>
       <div class="space-y-6">
         <template x-for="b in dati.banche" :key="b.id">
-          <div class="glass-card bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-3">
-              <h3 class="font-bold flex items-center gap-2 flex-wrap">
-                <span x-text="b.nome + ' — ' + b.intestatario"></span>
-                <span class="text-xs px-1.5 py-0.5 rounded-md bg-gray-100 dark:bg-gray-700 font-normal text-gray-600 dark:text-gray-300" x-text="b.currency || 'EUR'"></span>
-              </h3>
-              <div class="text-sm flex flex-wrap gap-x-4 gap-y-1 items-baseline">
-                <span class="inline-flex flex-wrap gap-2 items-baseline">Incassato:
+          <div class="glass-card" style="padding:16px;">
+            <div class="bank-tab is-active" style="width:auto;cursor:default;padding:8px 4px 12px;border:0;background:transparent;box-shadow:none;backdrop-filter:none;outline:none;">
+              <span class="bank-icon" style="background:var(--gradient-logo);"></span>
+              <div class="bank-meta">
+                <div class="bank-name" x-text="b.nome"></div>
+                <div class="bank-holder" x-text="b.intestatario + ' · ' + (b.currency || 'EUR')"></div>
+              </div>
+              <div class="bank-total tnum" style="text-align:left;">
+                <span class="inline-flex flex-wrap gap-2 items-baseline" style="font-size:13px;">Incassato:
                   <template x-for="cur in ['EUR','USD']" :key="cur">
                     <strong x-show="totaleIncassatoBancaMese(b.id)[cur] > 0" class="text-green-600 dark:text-green-400" x-text="formatValuta(totaleIncassatoBancaMese(b.id)[cur], cur)"></strong>
                   </template>
                   <strong x-show="totaleIncassatoBancaMese(b.id).EUR === 0 && totaleIncassatoBancaMese(b.id).USD === 0" class="text-green-600 dark:text-green-400" x-text="formatValuta(0, b.currency)"></strong>
                 </span>
-                <span class="inline-flex flex-wrap gap-2 items-baseline">Da girare:
+                <span class="inline-flex flex-wrap gap-2 items-baseline" style="font-size:13px;margin-left:14px;">Da girare:
                   <template x-for="cur in ['EUR','USD']" :key="cur">
                     <strong x-show="totaleDaGirareBancaMese(b.id)[cur] > 0" class="text-orange-600 dark:text-orange-400" x-text="formatValuta(totaleDaGirareBancaMese(b.id)[cur], cur)"></strong>
                   </template>
@@ -912,14 +912,14 @@
               </div>
             </div>
             <div class="overflow-x-auto">
-              <table class="w-full table-dense">
-                <thead class="bg-gray-50 dark:bg-gray-750"><tr>
-                  <th class="text-left">Proprieta</th><th class="text-left">Data incasso</th><th class="text-right">Importo</th>
-                  <th class="text-left">Girato</th><th class="text-left">Banca dest.</th><th class="text-left">Azioni</th>
+              <table class="glass-table">
+                <thead><tr>
+                  <th>Proprieta</th><th>Data incasso</th><th class="text-right">Importo</th>
+                  <th>Girato</th><th>Banca dest.</th><th>Azioni</th>
                 </tr></thead>
                 <tbody>
                   <template x-for="inc in incassiBancaMese(b.id)" :key="inc.id">
-                    <tr class="border-t border-gray-100 dark:border-gray-700">
+                    <tr>
                       <td x-text="nomeProprieta(inc.proprietaId)"></td>
                       <td x-text="inc.dataIncasso ? formatData(inc.dataIncasso) : '—'"></td>
                       <td class="text-right" x-text="formatValuta(inc.importo, inc.currency)"></td>
@@ -927,7 +927,7 @@
                       <td x-text="inc.bancaDestinazioneId ? nomeBanca(inc.bancaDestinazioneId) : '—'"></td>
                       <td>
                         <template x-if="inc.dataIncasso && !inc.girato">
-                          <select @change="segnaGirato(inc, $event.target.value)" class="text-xs border rounded px-1 py-0.5 dark:bg-gray-700 dark:border-gray-600">
+                          <select @change="segnaGirato(inc, $event.target.value)">
                             <option value="">Gira a...</option>
                             <template x-for="bd in dati.banche.filter(x => x.id !== b.id)" :key="bd.id">
                               <option :value="bd.id" x-text="bd.nome"></option>
