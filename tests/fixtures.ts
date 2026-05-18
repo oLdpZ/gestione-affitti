@@ -122,17 +122,38 @@ type Fixtures = {
   seedWithOrphan: void;
 };
 
+/**
+ * Naviga a / e ripulisce localStorage prima del login. Necessario per evitare
+ * che la cache locale di run precedenti vinca il conflict resolution di
+ * caricaDatiUtente (cacheEPiuRecente branch) — soprattutto nei test di
+ * soft-delete dove una run abortita lascia tombstone nel cache locale.
+ */
+async function clearLocalCache(page: import('@playwright/test').Page): Promise<void> {
+  // Navighiamo a un path innocuo per ottenere un origin valido prima di
+  // toccare localStorage (about:blank non ha storage scope per il nostro origin).
+  await page.goto('/');
+  await page.evaluate(() => {
+    try {
+      localStorage.removeItem('gestione_affitti_cache');
+      localStorage.removeItem('gestione_affitti_snapshots');
+      localStorage.removeItem('errori');
+    } catch (_) {}
+  });
+}
+
 export const test = base.extend<Fixtures>({
   seedData: [
-    async ({}, use) => {
+    async ({ page }, use) => {
       await seedSupabase(MOCK_DATI);
+      await clearLocalCache(page);
       await use();
     },
     { auto: false },
   ],
   seedWithOrphan: [
-    async ({}, use) => {
+    async ({ page }, use) => {
       await seedSupabase(MOCK_DATI_WITH_ORPHAN);
+      await clearLocalCache(page);
       await use();
     },
     { auto: false },
