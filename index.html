@@ -948,29 +948,55 @@
 
     <!-- ========== 5. UTENZE ========== -->
     <div x-show="vistaCorrente === 'utenze'" class="page-enter">
-      <h2 class="text-lg font-bold mb-4">Utenze</h2>
+      <!-- Stat cards Luce / Gas / Acqua -->
+      <div class="utenza-stats">
+        <div class="glass-card utenza-stat utenza-luce">
+          <div class="utenza-icon">💡</div>
+          <div class="utenza-meta">
+            <div class="section-eyebrow">LUCE</div>
+            <div class="utenza-num tnum" x-text="formatValuta((dati.utenze || []).filter(u => u.tipo === 'luce').reduce((s,u) => s + (u.importo || 0), 0), 'EUR')"></div>
+            <div class="utenza-count" x-text="(dati.utenze || []).filter(u => u.tipo === 'luce' && u.stato !== 'pagata' && u.stato !== 'rimborsata_inquilino').length + ' da pagare'"></div>
+          </div>
+        </div>
+        <div class="glass-card utenza-stat utenza-gas">
+          <div class="utenza-icon">🔥</div>
+          <div class="utenza-meta">
+            <div class="section-eyebrow">GAS</div>
+            <div class="utenza-num tnum" x-text="formatValuta((dati.utenze || []).filter(u => u.tipo === 'gas').reduce((s,u) => s + (u.importo || 0), 0), 'EUR')"></div>
+            <div class="utenza-count" x-text="(dati.utenze || []).filter(u => u.tipo === 'gas' && u.stato !== 'pagata' && u.stato !== 'rimborsata_inquilino').length + ' da pagare'"></div>
+          </div>
+        </div>
+        <div class="glass-card utenza-stat utenza-acqua">
+          <div class="utenza-icon">💧</div>
+          <div class="utenza-meta">
+            <div class="section-eyebrow">ACQUA</div>
+            <div class="utenza-num tnum" x-text="formatValuta((dati.utenze || []).filter(u => u.tipo === 'acqua').reduce((s,u) => s + (u.importo || 0), 0), 'EUR')"></div>
+            <div class="utenza-count" x-text="(dati.utenze || []).filter(u => u.tipo === 'acqua' && u.stato !== 'pagata' && u.stato !== 'rimborsata_inquilino').length + ' da pagare'"></div>
+          </div>
+        </div>
+      </div>
       <!-- Filtri -->
-      <div class="flex flex-wrap gap-3 mb-4">
-        <select x-model="filtroUtenzeProprieta" class="text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600">
+      <div class="filter-row">
+        <select x-model="filtroUtenzeProprieta">
           <option value="">Tutte le proprieta</option>
           <template x-for="p in dati.proprieta" :key="p.id"><option :value="p.id" x-text="p.nome"></option></template>
         </select>
-        <select x-model="filtroUtenzeTipo" class="text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600">
+        <select x-model="filtroUtenzeTipo">
           <option value="">Tutti i tipi</option>
           <option value="acqua">Acqua</option><option value="luce">Luce</option><option value="gas">Gas</option>
         </select>
-        <select x-model="filtroUtenzeStato" class="text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600">
+        <select x-model="filtroUtenzeStato">
           <option value="">Tutti gli stati</option>
           <option value="da_ricevere">Da ricevere</option><option value="ricevuta">Ricevuta</option>
           <option value="pagata">Pagata</option><option value="rimborsata_inquilino">Rimborsata</option>
         </select>
-        <select x-model.number="filtroUtenzeAnno" class="text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600">
+        <select x-model.number="filtroUtenzeAnno">
           <template x-for="a in anniDisponibili()" :key="a"><option :value="a" x-text="a"></option></template>
         </select>
-        <button @click="mostraFormUtenza = true" class="px-3 py-1.5 bg-primary-500 hover:bg-primary-600 text-white rounded-lg text-sm font-medium shadow-sm transition active:scale-95">+ Nuova utenza</button>
+        <button @click="mostraFormUtenza = true" class="btn-primary">+ Nuova utenza</button>
       </div>
       <!-- Form nuova utenza -->
-      <div x-show="mostraFormUtenza" class="glass-card bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 mb-4">
+      <div x-show="mostraFormUtenza" class="glass-card" style="padding:14px;margin-bottom:14px;">
         <h3 class="font-bold text-sm mb-3">Nuova Utenza</h3>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div><label class="text-xs">Proprieta</label>
@@ -1003,45 +1029,46 @@
         </div>
       </div>
       <!-- Tabella utenze -->
-      <div class="overflow-x-auto">
-        <table class="w-full table-dense bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-          <thead class="bg-gray-50 dark:bg-gray-750"><tr>
-            <th class="text-left">Proprieta</th><th class="text-left">Tipo</th><th class="text-left">Fornitore</th>
-            <th class="text-left">Periodo</th><th class="text-left">Scadenza</th><th class="text-right">Importo</th>
-            <th class="text-left">Stato</th><th class="text-left">Azioni</th>
-          </tr></thead>
-          <tbody>
-            <template x-for="u in utenzeFiltrate()" :key="u.id">
-              <tr class="border-t border-gray-100 dark:border-gray-700">
-                <td x-text="nomeProprieta(u.proprietaId)"></td><td x-text="u.tipo"></td>
-                <td x-text="u.fornitore || '—'"></td><td x-text="u.periodoRiferimento"></td>
-                <td x-text="formatData(u.dataScadenza)"></td><td class="text-right" x-text="formatValuta(u.importo, u.currency)"></td>
-                <td x-html="badgeStatoUtenza(u.stato)"></td>
-                <td>
-                  <select @change="cambiaStatoUtenza(u, $event.target.value); $event.target.value = ''"
-                          class="text-xs border rounded px-1 py-0.5 dark:bg-gray-700 dark:border-gray-600">
-                    <option value="">Cambia stato...</option>
-                    <option value="da_ricevere">Da ricevere</option><option value="ricevuta">Ricevuta</option>
-                    <option value="pagata">Pagata</option><option value="rimborsata_inquilino">Rimborsata</option>
-                  </select>
-                  <button @click="eliminaUtenza(u.id)" class="text-xs text-red-500 hover:text-red-700 ml-1" title="Elimina">&#10005;</button>
-                </td>
-              </tr>
-            </template>
-          </tbody>
-          <tfoot class="bg-gray-50 dark:bg-gray-750 font-semibold"><tr>
-            <td colspan="5" class="text-right text-xs">Totale:</td>
-            <td class="text-right text-xs">
-              <div class="flex flex-wrap gap-2 justify-end">
-                <template x-for="cur in ['EUR','USD']" :key="cur">
-                  <span x-show="totaleUtenzeFiltrate()[cur] > 0" x-text="formatValuta(totaleUtenzeFiltrate()[cur], cur)"></span>
-                </template>
-                <span x-show="totaleUtenzeFiltrate().EUR === 0 && totaleUtenzeFiltrate().USD === 0" x-text="formatValuta(0, 'EUR')"></span>
-              </div>
-            </td>
-            <td colspan="2"></td>
-          </tr></tfoot>
-        </table>
+      <div class="glass-card" style="padding:14px;">
+        <div class="overflow-x-auto">
+          <table class="glass-table">
+            <thead><tr>
+              <th>Proprieta</th><th>Tipo</th><th>Fornitore</th>
+              <th>Periodo</th><th>Scadenza</th><th class="text-right">Importo</th>
+              <th>Stato</th><th>Azioni</th>
+            </tr></thead>
+            <tbody>
+              <template x-for="u in utenzeFiltrate()" :key="u.id">
+                <tr>
+                  <td x-text="nomeProprieta(u.proprietaId)"></td><td x-text="u.tipo"></td>
+                  <td x-text="u.fornitore || '—'"></td><td x-text="u.periodoRiferimento"></td>
+                  <td x-text="formatData(u.dataScadenza)"></td><td class="text-right" x-text="formatValuta(u.importo, u.currency)"></td>
+                  <td x-html="badgeStatoUtenza(u.stato)"></td>
+                  <td>
+                    <select @change="cambiaStatoUtenza(u, $event.target.value); $event.target.value = ''">
+                      <option value="">Cambia stato...</option>
+                      <option value="da_ricevere">Da ricevere</option><option value="ricevuta">Ricevuta</option>
+                      <option value="pagata">Pagata</option><option value="rimborsata_inquilino">Rimborsata</option>
+                    </select>
+                    <button @click="eliminaUtenza(u.id)" class="text-xs text-red-500 hover:text-red-700 ml-1" title="Elimina">&#10005;</button>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+            <tfoot><tr style="font-weight:600;">
+              <td colspan="5" class="text-right text-xs">Totale:</td>
+              <td class="text-right text-xs">
+                <div class="flex flex-wrap gap-2 justify-end">
+                  <template x-for="cur in ['EUR','USD']" :key="cur">
+                    <span x-show="totaleUtenzeFiltrate()[cur] > 0" x-text="formatValuta(totaleUtenzeFiltrate()[cur], cur)"></span>
+                  </template>
+                  <span x-show="totaleUtenzeFiltrate().EUR === 0 && totaleUtenzeFiltrate().USD === 0" x-text="formatValuta(0, 'EUR')"></span>
+                </div>
+              </td>
+              <td colspan="2"></td>
+            </tr></tfoot>
+          </table>
+        </div>
       </div>
     </div>
 
