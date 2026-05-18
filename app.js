@@ -240,6 +240,11 @@ function app() {
 
     supportWhatsapp: SUPPORT_WHATSAPP,
 
+    // Stub: l'impl reale arriva con T13. Mantenuto qui perche eliminaIncasso/
+    // eliminaProprieta lo chiamano e devono essere safe se l'utente clicca
+    // prima che l'UI del toast sia mounted (boot race).
+    mostraUndoToast(_message, _undoFn) { /* no-op stub, replaced in T13 */ },
+
     /** Aggiunge un'entry al ring buffer FIFO di 50 errori in localStorage.errori.
      *  Mai re-throwa: solo log + storage. Filtra implicitamente i campi: niente PII. */
     pushErrore(entry) {
@@ -676,9 +681,15 @@ function app() {
       this.incassoInModifica = null;
     },
     eliminaIncasso(id) {
-      if (!confirm('Eliminare questo incasso?')) return;
-      this.dati.incassiAffitti = this.dati.incassiAffitti.filter(i => i.id !== id);
+      const inc = this.dati.incassiAffitti.find(i => i.id === id);
+      if (!inc) return;
+      const oldDeletedAt = inc.deletedAt;
+      inc.deletedAt = new Date().toISOString();
       this.salva();
+      this.mostraUndoToast('Incasso eliminato', () => {
+        inc.deletedAt = oldDeletedAt;
+        this.salva();
+      });
     },
 
     // --- Proprieta dettaglio ---
@@ -814,11 +825,27 @@ function app() {
       this.mostraFormProprieta = false; this.generaIncassiAttesi(); this.salva();
     },
     eliminaProprieta(id) {
-      if (!confirm('Eliminare questa proprieta e tutti i dati collegati?')) return;
-      this.dati.proprieta = this.dati.proprieta.filter(p => p.id !== id);
-      this.dati.incassiAffitti = this.dati.incassiAffitti.filter(i => i.proprietaId !== id);
-      this.dati.utenze = this.dati.utenze.filter(u => u.proprietaId !== id);
+      const p = this.dati.proprieta.find(x => x.id === id);
+      if (!p) return;
+      const ora = new Date().toISOString();
+      // Cascading soft-delete sugli incassi attivi (utenze restano linkate via proprietaId
+      // e ricompaiono naturalmente al restore della proprieta — niente tombstone in PR1).
+      const incassiToccati = this.attivi(this.dati.incassiAffitti).filter(i => i.proprietaId === id);
+      const preState = {
+        propPrev: p.deletedAt,
+        incassi: incassiToccati.map(i => ({ id: i.id, deletedAt: i.deletedAt })),
+      };
+      p.deletedAt = ora;
+      for (const i of incassiToccati) i.deletedAt = ora;
       this.salva();
+      this.mostraUndoToast('Proprieta eliminata', () => {
+        p.deletedAt = preState.propPrev;
+        for (const ref of preState.incassi) {
+          const i = this.dati.incassiAffitti.find(x => x.id === ref.id);
+          if (i) i.deletedAt = ref.deletedAt;
+        }
+        this.salva();
+      });
     },
 
     // --- Impostazioni: Banche ---
