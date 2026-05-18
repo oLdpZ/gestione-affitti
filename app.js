@@ -685,6 +685,20 @@ function app() {
     salva() {
       if (!this.utente) return;
       this.statoSalvataggio = 'salvataggio';
+      // Snapshot pre-mutation: ogni chiamata a salva() corrisponde a UN'azione
+      // utente discreta (eliminaIncasso, salvaBanca, segnaIncassatoOggi, ...).
+      // Pushiamo qui (non in salvaSubito) perche' il debounce di 300ms coalescerebbe
+      // due azioni rapide consecutive in un solo salvaSubito → perderemmo lo
+      // snapshot intermedio (R-J: M-4 originale era directionally right ma
+      // posizionarlo nel debounced runner perde stati osservabili dall'utente).
+      if (this._lastSnapshotData) {
+        this.pushSnapshot(this._lastSnapshotData);
+      }
+      // Aggiorna il riferimento "ultimo stato osservato" alla mutazione appena
+      // applicata: sara' il pre-state della prossima salva().
+      try {
+        this._lastSnapshotData = JSON.parse(JSON.stringify(this.dati));
+      } catch (_) {}
       try {
         localStorage.setItem('gestione_affitti_cache', JSON.stringify({
           data: this.dati,
@@ -699,12 +713,6 @@ function app() {
     /** Salvataggio immediato su Supabase (upsert) */
     async salvaSubito() {
       if (!this.utente) return;
-      // Snapshot pre-mutation: pushiamo lo stato PRECEDENTE a questo save
-      // (catturato all'ultimo save riuscito o al load). Garantisce che la
-      // timeline rifletta gli stati osservabili dall'utente, non i debounce.
-      if (this._lastSnapshotData) {
-        this.pushSnapshot(this._lastSnapshotData);
-      }
       const ora = new Date().toISOString();
       // Aggiorna sempre la cache locale PRIMA dell'upsert: cosi se la rete
       // cade a meta operazione le modifiche non vanno perse.
@@ -742,7 +750,10 @@ function app() {
       try {
         await tentativoUpsert();
         scriviCache();
-        this._lastSnapshotData = JSON.parse(JSON.stringify(this.dati));
+        // _lastSnapshotData NON viene aggiornato qui: la salva() chiamante
+        // l'ha gia' aggiornato sincronicamente. Aggiornarlo di nuovo qui
+        // post-await sovrascriverebbe lo stato di una mutazione utente che
+        // potrebbe essere arrivata nei 300ms+network successivi.
         this.modalitaOffline = false;
         this.statoSalvataggio = 'salvato';
       } catch (e) {
@@ -759,7 +770,6 @@ function app() {
             if (refreshErr) throw refreshErr;
             await tentativoUpsert();
             scriviCache();
-            this._lastSnapshotData = JSON.parse(JSON.stringify(this.dati));
             this.modalitaOffline = false;
             this.statoSalvataggio = 'salvato';
             return;
