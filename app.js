@@ -173,6 +173,7 @@ function app() {
       if (session) {
         this.utente = session.user;
         await this.caricaDatiUtente();
+        this.purgeOldSoftDeleted();
       }
       this.caricamentoIniziale = false;
 
@@ -282,6 +283,39 @@ function app() {
       }
       this.salva();
     },
+    /** Hard-rimuove i soft-deleted con deletedAt < now-30gg.
+     *  Idempotente: una seconda chiamata immediata non rimuove nulla.
+     *  Log su console + entry in errori[] severity:info per visibilita. */
+    purgeOldSoftDeleted() {
+      try {
+        const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+        let purged = 0;
+        if (Array.isArray(this.dati.proprieta)) {
+          const propsToPurge = this.dati.proprieta.filter(p => p.deletedAt && p.deletedAt < cutoff).map(p => p.id);
+          if (propsToPurge.length > 0) {
+            this.dati.proprieta = this.dati.proprieta.filter(p => !propsToPurge.includes(p.id));
+            // Cascading hard-delete sugli incassi figli (anche non-30gg, perche la proprieta non c'e piu).
+            if (Array.isArray(this.dati.incassiAffitti)) {
+              this.dati.incassiAffitti = this.dati.incassiAffitti.filter(i => !propsToPurge.includes(i.proprietaId));
+            }
+            purged += propsToPurge.length;
+          }
+        }
+        if (Array.isArray(this.dati.incassiAffitti)) {
+          const before = this.dati.incassiAffitti.length;
+          this.dati.incassiAffitti = this.dati.incassiAffitti.filter(i => !(i.deletedAt && i.deletedAt < cutoff));
+          purged += before - this.dati.incassiAffitti.length;
+        }
+        if (purged > 0) {
+          console.info('[purge] Auto-rimossi ' + purged + ' elementi soft-deleted >30 giorni');
+          this.pushErrore({ message: 'auto-purge: rimossi ' + purged + ' elementi soft-deleted >30gg', severity: 'info' });
+          this.salva();
+        }
+      } catch (e) {
+        this.pushErrore({ message: 'purgeOldSoftDeleted: ' + (e && e.message), severity: 'warn' });
+      }
+    },
+
     // --- Snapshot ring buffer (10 stati pre-mutation) ---
     pushSnapshot(preState) {
       if (!preState) return;
