@@ -1044,12 +1044,12 @@
       <h2 class="text-lg font-bold mb-4">Impostazioni</h2>
 
       <!-- Gestione Proprieta -->
-      <div class="mb-8">
-        <div class="flex items-center justify-between mb-3">
+      <div class="mb-8 settings-section glass-card" data-testid="prop-section">
+        <div class="settings-head flex items-center justify-between mb-3">
           <h3 class="font-bold">Proprieta</h3>
-          <button @click="mostraFormProprieta = true; editProprieta = creaProprieta()" class="px-3 py-1 bg-primary-500 text-white rounded text-sm">+ Nuova</button>
+          <button @click="mostraFormProprieta = true; editProprieta = creaProprieta()" class="btn-primary px-3 py-1 bg-primary-500 text-white rounded text-sm">+ Nuova</button>
         </div>
-        <div x-show="mostraFormProprieta" class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 mb-4">
+        <div x-show="mostraFormProprieta" data-testid="prop-form" class="settings-form glass-card bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 mb-4">
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <div><label class="text-xs">Nome</label>
               <input type="text" x-model="editProprieta.nome" class="w-full text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600"></div>
@@ -1114,12 +1114,12 @@
       </div>
 
       <!-- Gestione Banche -->
-      <div>
-        <div class="flex items-center justify-between mb-3">
+      <div class="settings-section glass-card" data-testid="bank-section">
+        <div class="settings-head flex items-center justify-between mb-3">
           <h3 class="font-bold">Banche</h3>
-          <button @click="mostraFormBanca = true; editBanca = creaBanca()" class="px-3 py-1 bg-primary-500 text-white rounded text-sm">+ Nuova</button>
+          <button @click="mostraFormBanca = true; editBanca = creaBanca()" class="btn-primary px-3 py-1 bg-primary-500 text-white rounded text-sm">+ Nuova</button>
         </div>
-        <div x-show="mostraFormBanca" class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 mb-4">
+        <div x-show="mostraFormBanca" class="settings-form glass-card bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 mb-4">
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div><label class="text-xs">Nome banca</label>
               <input type="text" x-model="editBanca.nome" class="w-full text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600"></div>

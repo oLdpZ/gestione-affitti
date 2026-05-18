@@ -82,14 +82,12 @@ test.describe('calendario', () => {
     await doLogin(page);
     await page.click('button:has-text("Impostazioni")');
 
-    // Scope alla sezione Proprieta (stesso pattern di REGRESSION-04).
-    const propSection = page
-      .locator('div.mb-8')
-      .filter({ has: page.locator('h3', { hasText: /^Proprieta$/ }) });
+    // Scope alla sezione Proprieta: data-testid="prop-section" (PR0 redesign).
+    const propSection = page.locator('[data-testid="prop-section"]');
     await propSection.locator('button:has-text("+ Nuova")').click();
 
-    // Form panel: attributo Alpine univoco.
-    const propForm = propSection.locator('[x-show="mostraFormProprieta"]');
+    // Form panel: data-testid="prop-form" (PR0 redesign).
+    const propForm = propSection.locator('[data-testid="prop-form"]');
     await expect(propForm).toBeVisible();
 
     // Nome: x-model="editProprieta.nome" — unico input[type="text"] nel form

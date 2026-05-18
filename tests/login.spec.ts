@@ -18,7 +18,7 @@ test.describe('login', () => {
       timeout: 15_000,
     });
     // Status dot esiste due volte (desktop + sm:hidden mobile). first() per non strict.
-    await expect(page.locator('.status-dot').first()).toBeVisible();
+    await expect(page.locator('[data-testid="status-dot"]').first()).toBeVisible();
     await expect(page.locator('text=Appartamento Test Via Roma').first()).toBeVisible();
   });
 
@@ -26,10 +26,8 @@ test.describe('login', () => {
     await doLogin(page);
     await page.click('button:has-text("Impostazioni")');
 
-    // Scope alla sezione Proprieta: div.mb-8 contenente h3 "Proprieta".
-    const propSection = page
-      .locator('div.mb-8')
-      .filter({ has: page.locator('h3', { hasText: /^Proprieta$/ }) });
+    // Scope alla sezione Proprieta: data-testid="prop-section" (PR0 redesign).
+    const propSection = page.locator('[data-testid="prop-section"]');
 
     // Riga proprieta -> bottone Modifica (apre form sopra la tabella).
     await propSection
@@ -38,8 +36,8 @@ test.describe('login', () => {
       .locator('button:has-text("Modifica")')
       .click();
 
-    // Form panel: l'attributo Alpine [x-show="mostraFormProprieta"] e' univoco.
-    const propForm = propSection.locator('[x-show="mostraFormProprieta"]');
+    // Form panel: data-testid="prop-form" (PR0 redesign).
+    const propForm = propSection.locator('[data-testid="prop-form"]');
     await expect(propForm).toBeVisible();
 
     // Pitfall 2: register dialog handler PRIMA di Salva.
