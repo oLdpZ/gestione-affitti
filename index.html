@@ -323,11 +323,51 @@
       flex: 1; min-height: 0; overflow: auto;
       padding: 22px 28px;
     }
+
+    /* ===== Drawer responsive (T05) ===== */
+    body.drawer-locked { overflow: hidden; touch-action: none; }
+
+    @media (max-width: 899px) {
+      .window-shell {
+        grid-template-columns: 1fr;
+        margin: 0;
+        border-radius: 0;
+        max-width: 100vw; max-height: 100vh;
+      }
+      .sidebar {
+        position: fixed; top: 0; bottom: 0; left: 0;
+        width: var(--drawer-width);
+        transform: translateX(-100%);
+        transition: transform var(--drawer-duration) var(--ease-out-apple);
+        z-index: var(--z-drawer);
+        border-right: 0.5px solid var(--border);
+        background: rgba(255,255,255,0.85);
+        backdrop-filter: var(--blur-shell);
+        -webkit-backdrop-filter: var(--blur-shell);
+      }
+      .sidebar.drawer-open { transform: translateX(0); }
+      .drawer-backdrop {
+        position: fixed; inset: 0;
+        background: rgba(0,0,0,0.18);
+        backdrop-filter: var(--blur-backdrop);
+        -webkit-backdrop-filter: var(--blur-backdrop);
+        z-index: var(--z-drawer-backdrop);
+      }
+      .hamburger { display: inline-flex; }
+      .traffic-lights { display: none; }
+      .page-body { padding: 16px 14px 32px; }
+    }
+    @media (min-width: 900px) {
+      .drawer-backdrop { display: none !important; }
+      .hamburger { display: none; }
+    }
   </style>
 </head>
 <body class="bg-base">
 
-<div x-data="app()" x-init="init()" x-cloak class="flex flex-col min-h-screen">
+<div x-data="app()" x-init="init(); $watch('drawerOpen', v => document.body.classList.toggle('drawer-locked', v))"
+     @keydown.escape.window="drawerOpen = false"
+     x-cloak class="bg-base">
 
   <!-- ===== SCHERMATA DI LOGIN ===== -->
   <div x-show="!utente && !caricamentoIniziale" class="min-h-screen flex items-center justify-center p-4">
@@ -1128,6 +1168,7 @@ function app() {
     ],
     vistaCorrente: 'dashboard',
     mobileMenuOpen: false,
+    drawerOpen: false,
     nomiMesi: ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'],
     dati: { dataVersion: 2, proprieta: [], banche: [], incassiAffitti: [], utenze: [] },
     statoSalvataggio: 'salvato',
