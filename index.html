@@ -74,6 +74,17 @@
       --gradient-logo:   linear-gradient(135deg, #0071e3, #5e9eff);
       --gradient-avatar: linear-gradient(135deg, #ff9f0a, #ff3b30);
 
+      /* ===== Property banner palette (T08) ===== */
+      --banner-1: linear-gradient(135deg, #ffd6a5, #ffadad);
+      --banner-2: linear-gradient(135deg, #a0c4ff, #bdb2ff);
+      --banner-3: linear-gradient(135deg, #caffbf, #9bf6ff);
+      --banner-4: linear-gradient(135deg, #fdffb6, #ffd6a5);
+      --banner-5: linear-gradient(135deg, #ffc6ff, #bdb2ff);
+      --banner-6: linear-gradient(135deg, #b8c0ff, #c8b6ff);
+      --banner-7: linear-gradient(135deg, #ffafcc, #ffc8dd);
+      --banner-8: linear-gradient(135deg, #a2d2ff, #bde0fe);
+      --banner-9: linear-gradient(135deg, #cdb4db, #ffafcc);
+
       /* ===== Radius ===== */
       --r-xs: 6px; --r-sm: 8px; --r-md: 12px; --r-lg: 16px; --r-xl: 22px; --r-pill: 999px;
       --r-button: 7px;
@@ -324,6 +335,78 @@
       padding: 22px 28px;
     }
 
+    /* ===== Dashboard (T06) ===== */
+    .dash-hero { margin-bottom: 22px; }
+    .dash-hero .dash-h1 { font-family: var(--font-display); font-size: 36px; font-weight: 700; letter-spacing: -0.03em; margin: 4px 0; }
+    .dash-hero .dash-sub { color: var(--text-secondary); font-size: 14px; }
+    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 22px; }
+    .kpi-card { padding: 14px; display: flex; flex-direction: column; gap: 6px; }
+    .kpi-icon { width: 28px; height: 28px; border-radius: var(--r-sm); display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 13px; }
+    .kpi-green { background: var(--green-soft); color: var(--green); }
+    .kpi-amber { background: var(--amber-soft); color: var(--amber); }
+    .kpi-red   { background: var(--red-soft);   color: var(--red); }
+    .kpi-blue  { background: var(--accent-soft); color: var(--accent); }
+    .kpi-label { font-size: 12px; color: var(--text-secondary); }
+    .kpi-num { font-family: var(--font-mono); font-size: 24px; font-weight: 600; color: var(--text-primary); letter-spacing: -0.02em; }
+
+    /* ===== Calendario (T07) ===== */
+    .calendar-col { display: flex; flex-direction: column; gap: 10px; }
+    .calendar-card {
+      padding: 12px 14px;
+      border-left: 3px solid var(--text-tertiary);
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .calendar-card[data-status="incassato"] { border-left-color: var(--green); }
+    .calendar-card[data-status="attesa"]    { border-left-color: var(--amber); }
+    .calendar-card[data-status="ritardo"]   { border-left-color: var(--red); }
+    .calendar-card[data-status="sistema"]   { border-left-color: var(--purple); }
+
+    /* ===== Proprieta (T08) ===== */
+    .prop-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+    .prop-card { padding: 0; text-align: left; cursor: pointer; overflow: hidden; border: 0; }
+    .prop-banner { height: 80px; }
+    .prop-body { padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
+    .prop-name { font-family: var(--font-display); font-size: 15px; font-weight: 600; }
+    .prop-meta { font-size: 12px; color: var(--text-secondary); }
+    .prop-importo { font-size: 16px; font-weight: 500; color: var(--text-primary); margin-top: 4px; }
+    .glass-table { width: 100%; border-collapse: collapse; background: transparent; }
+    .glass-table th, .glass-table td { padding: 8px 12px; font-size: 12.5px; border-bottom: 0.5px solid var(--divider); text-align: left; }
+    .glass-table th { font-weight: 500; color: var(--text-secondary); }
+    .glass-table tbody tr:hover { background: rgba(0,0,0,0.02); }
+
+    /* ===== Banche (T09) ===== */
+    .bank-tabs { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 16px; }
+    .bank-tab { width: 220px; flex-shrink: 0; padding: 12px; display: grid; grid-template-columns: 36px 1fr; gap: 10px; align-items: center; cursor: pointer; border: 0; text-align: left; }
+    .bank-tab.is-active { outline: 2px solid var(--accent-ring); outline-offset: -2px; }
+    .bank-icon { width: 36px; height: 36px; border-radius: var(--r-sm); }
+    .bank-name { font-weight: 600; font-size: 13px; }
+    .bank-holder { font-size: 11px; color: var(--text-tertiary); }
+    .bank-total { grid-column: 1 / -1; font-size: 16px; font-weight: 500; margin-top: 4px; }
+
+    /* ===== Utenze (T10) ===== */
+    .utenza-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 18px; }
+    .utenza-stat { padding: 14px; display: flex; gap: 12px; align-items: center; }
+    .utenza-icon { width: 36px; height: 36px; border-radius: var(--r-sm); background: var(--accent-soft); display: flex; align-items: center; justify-content: center; font-size: 18px; }
+    .utenza-luce  .utenza-icon { background: rgba(255,204,0,0.15);  color: var(--utenza-luce); }
+    .utenza-gas   .utenza-icon { background: var(--amber-soft);     color: var(--utenza-gas); }
+    .utenza-acqua .utenza-icon { background: var(--teal-soft);      color: var(--utenza-acqua); }
+    .utenza-num { font-family: var(--font-mono); font-size: 18px; font-weight: 600; margin: 2px 0; }
+    .utenza-count { font-size: 11.5px; color: var(--text-tertiary); }
+    .filter-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+    .filter-row select {
+      padding: 6px 28px 6px 10px; font-size: 13px;
+      border: 0.5px solid var(--border); border-radius: var(--r-sm);
+      background: var(--surface); appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 12 12' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M3 4.5l3 3 3-3' stroke='%236e6e73' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 8px center; background-size: 12px;
+    }
+
+    /* ===== Impostazioni (T11) ===== */
+    .settings-section { padding: 18px; margin-bottom: 18px; }
+    .settings-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .settings-head h3 { font-family: var(--font-display); font-size: 17px; }
+    .settings-form { padding: 14px; margin-bottom: 14px; background: rgba(255,255,255,0.45); }
+
     /* ===== Drawer responsive (T05) ===== */
     body.drawer-locked { overflow: hidden; touch-action: none; }
 
@@ -498,6 +581,11 @@
 
     <!-- ========== 1. DASHBOARD ========== -->
     <div x-show="vistaCorrente === 'dashboard'" class="page-enter">
+      <div class="dash-hero">
+        <div class="section-eyebrow" x-text="nomeMeseCorrente().toUpperCase()"></div>
+        <h1 class="dash-h1">Dashboard</h1>
+        <p class="dash-sub" x-text="(incassiMeseCorrente() || []).length + ' incassi nel mese'"></p>
+      </div>
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
         <h2 class="text-lg font-bold" x-text="'Dashboard — ' + nomeMeseCorrente()"></h2>
         <div class="grid grid-cols-2 sm:flex sm:gap-3 gap-2 text-xs sm:text-sm">
