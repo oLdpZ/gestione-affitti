@@ -399,8 +399,19 @@ function app() {
 
     async importaJSON(event) {
       const file = event.target.files[0]; if (!file) return;
-      try { this.dati = JSON.parse(await file.text()); this.generaIncassiAttesi(); await this.salva();
-      } catch(e) { alert('Errore nel file JSON: ' + e.message); }
+      try {
+        const parsed = JSON.parse(await file.text());
+        // Bug 1 (DEC-020): import deve passare per migraDati altrimenti i JSON
+        // esportati con schemi v1/v2 mancano dei campi v3 (deletedAt, modificatoManualmente).
+        this.dati = migraDati(parsed);
+        this.generaIncassiAttesi();
+        await this.salva();
+      } catch(e) {
+        alert('Errore nel file JSON: ' + e.message);
+        if (typeof this.pushErrore === 'function') {
+          this.pushErrore({ ts: new Date().toISOString(), message: 'importaJSON: ' + (e && e.message), severity: 'error' });
+        }
+      }
     },
 
     // --- Generazione automatica incassi ---
@@ -417,7 +428,9 @@ function app() {
           const esistente = this.attivi(this.dati.incassiAffitti).find(i => i.proprietaId === prop.id && i.mese === mese);
           if (esistente) {
             // Aggiorna incassi non ancora incassati con i nuovi dati della proprieta
-            if (!esistente.dataIncasso) {
+            // Bug 2 (DEC-020): rispettare modificatoManualmente, altrimenti l'edit
+            // utente viene sovrascritto a ogni ri-run di generaIncassiAttesi.
+            if (!esistente.dataIncasso && !esistente.modificatoManualmente) {
               esistente.importo = prop.importoAffittoMensile;
               esistente.bancaId = prop.bancaIncasso;
               esistente.dataPrevista = dataPrevist(mese, prop.scadenzaAffitto);
@@ -578,7 +591,17 @@ function app() {
       if (idx >= 0) {
         // Se dataIncasso e stringa vuota, convertila in null
         if (this.incassoInModifica.dataIncasso === '') this.incassoInModifica.dataIncasso = null;
-        this.dati.incassiAffitti[idx] = { ...this.incassoInModifica };
+        // Bug 2 (DEC-020): marca come modificato manualmente se cambiano importo/banca/dataPrevista,
+        // cosi generaIncassiAttesi non sovrascrivera l'edit al prossimo run.
+        const orig = this.dati.incassiAffitti[idx];
+        const cambiato =
+          orig.importo !== this.incassoInModifica.importo ||
+          orig.bancaId !== this.incassoInModifica.bancaId ||
+          orig.dataPrevista !== this.incassoInModifica.dataPrevista;
+        this.dati.incassiAffitti[idx] = {
+          ...this.incassoInModifica,
+          modificatoManualmente: orig.modificatoManualmente || cambiato,
+        };
         this.salva();
       }
       this.incassoInModifica = null;
