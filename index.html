@@ -558,7 +558,7 @@
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 6h16M4 12h16M4 18h16" stroke-linecap="round"/></svg>
         </button>
         <div class="topbar-title">
-          <h1 class="topbar-h1" x-text="viste.find(v => v.id === vistaCorrente)?.label || 'Dashboard'"></h1>
+          <div class="topbar-h1" role="presentation" x-text="viste.find(v => v.id === vistaCorrente)?.label || 'Dashboard'"></div>
         </div>
         <div class="topbar-actions">
           <div class="search-pill" aria-disabled="true" title="Ricerca (presto)">
@@ -583,7 +583,7 @@
     <div x-show="vistaCorrente === 'dashboard'" class="page-enter">
       <div class="dash-hero">
         <div class="section-eyebrow" x-text="nomeMeseCorrente().toUpperCase()"></div>
-        <h1 class="dash-h1">Dashboard</h1>
+        <div class="dash-h1" role="presentation">Dashboard</div>
         <p class="dash-sub" x-text="(incassiMeseCorrente() || []).length + ' incassi nel mese'"></p>
       </div>
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
