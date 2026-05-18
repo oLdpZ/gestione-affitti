@@ -9,7 +9,7 @@ This ordering is locked by ADR-ceo-plan.md and cannot be reordered without a sup
 ## Phases
 
 - [ ] **Phase 1: PR5 — Test infrastructure** — Playwright suite + 5 LOCKED regression tests live in CI before any feature work
-- [ ] **Phase 2: PR0 — Apple/Sonoma redesign** — Glass + mesh UI, responsive sidebar→drawer, fonts, design tokens
+- [x] **Phase 2: PR0 — Apple/Sonoma redesign** — Glass + mesh UI, responsive sidebar→drawer, fonts, design tokens ✅ 2026-05-18
 - [ ] **Phase 3: PR1 — Data safety net + 3 bugfix + app.js extraction** — Soft-delete, cestino, snapshot, undo, salute dati, validation, bugfix bundle
 - [ ] **Phase 4: PR2a — PWA shell** — manifest.json, versioned service worker, custom install prompt
 - [ ] **Phase 5: PR2b — Schema migration + per-entity sync** — Blob → per-entity tables, mutation queue, conflict UI, inquilini/tipi_utenza/scadenze
@@ -112,8 +112,8 @@ This ordering is locked by ADR-ceo-plan.md and cannot be reordered without a sup
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. PR5 Test infrastructure | 0/1 | Active | - |
-| 2. PR0 Redesign | 0/0 | Not started | - |
+| 1. PR5 Test infrastructure | 1/1 | Complete | 2026-05-18 |
+| 2. PR0 Redesign | 1/1 | Complete | 2026-05-18 |
 | 3. PR1 Data safety + bugfix + app.js | 0/0 | Not started | - |
 | 4. PR2a PWA shell | 0/0 | Not started | - |
 | 5. PR2b Schema migration + sync | 0/0 | Not started | - |
