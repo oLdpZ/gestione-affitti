@@ -44,7 +44,7 @@
 
 import { test, expect, doLogin } from './fixtures';
 
-test.describe.skip('SNAPSHOT timeline — PR2a TODO', () => {
+test.describe('SNAPSHOT timeline — PR2a TODO', () => {
   test('SNAP-01: due save -> snapshot-section mostra >=2 entry -> ripristina', async ({ page, seedData }) => {
     await doLogin(page);
 

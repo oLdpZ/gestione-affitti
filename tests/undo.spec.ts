@@ -44,7 +44,7 @@
 
 import { test, expect, doLogin } from './fixtures';
 
-test.describe.skip('UNDO toast (5s, stack model) — PR2a TODO', () => {
+test.describe('UNDO toast (5s, stack model) — PR2a TODO', () => {
   test('UNDO-01: delete incasso -> undo toast visible -> Annulla -> incasso ricompare', async ({ page, seedData }) => {
     await doLogin(page);
     await page.click('button:has-text("Calendario")');

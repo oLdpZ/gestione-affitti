@@ -121,6 +121,17 @@ function app() {
     authLoading: false,
     debounceTimer: null,
     _lastSnapshotData: null,
+    // Counter reattivo per Alpine: ogni pushSnapshot lo incrementa, snapshots()
+    // lo legge (void this._snapshotVersion) -> Alpine sa di dover ri-eseguire
+    // il template x-for quando localStorage cambia. Senza questo, snapshots()
+    // legge solo localStorage e Alpine non traccia alcun dep -> il template
+    // resta sullo stato iniziale "Nessuno snapshot disponibile" anche dopo
+    // pushSnapshot effettivo (SNAP-01 root cause, scoperto via CI debug PR2a).
+    _snapshotVersion: 0,
+    // PWA install prompt (PR2a REQ-PWA-03)
+    installPromptVisible: false,
+    _deferredInstallPrompt: null,
+    _isIosSafari: false,
     storagePctValue: null,
     proprietaSelezionata: null,
     annoProprieta: new Date().getFullYear(),
@@ -162,12 +173,55 @@ function app() {
       try { localStorage.removeItem('gestione_affitti_dati'); } catch (e) {}
       // Fire-and-forget: aggiorna la percentuale di storage usato dal browser.
       this.aggiornaStoragePct();
+      // PWA shell (PR2a REQ-PWA-02 + CON-010 + CON-017 #3):
+      // unregistra SOLO i SW con scriptURL != sw.js corrente (es. registrazioni
+      // da versioni precedenti dell'app), poi registra sw.js scope './'.
+      // Filter-by-scriptURL preserva il SW attuale; il vecchio "unregister all"
+      // disinstallava anche se stesso ad ogni boot.
       if ('serviceWorker' in navigator) {
         try {
+          const SW_URL = 'sw.js';
+          const SW_ABS = new URL(SW_URL, location.href).href;
           const regs = await navigator.serviceWorker.getRegistrations();
-          for (const r of regs) await r.unregister();
-        } catch (e) {}
+          for (const r of regs) {
+            const active = r.active || r.installing || r.waiting;
+            const url = active && active.scriptURL ? active.scriptURL : '';
+            if (url !== SW_ABS) {
+              await r.unregister();
+            }
+          }
+          // fire-and-forget: non rallentare il boot
+          navigator.serviceWorker.register(SW_URL, { scope: './' }).catch((e) => {
+            console.warn('SW register failed:', e);
+          });
+        } catch (e) {
+          console.warn('SW boot error:', e);
+        }
       }
+
+      // PWA install prompt detection (PR2a REQ-PWA-03)
+      // iOS Safari NON espone beforeinstallprompt; iPadOS 13+ si maschera come
+      // MacIntel quindi il check UA da solo non basta (OQ-6 del plan).
+      const ua = navigator.userAgent;
+      const isIosUA = /iPhone|iPad|iPod/.test(ua);
+      const isIpadOS = navigator.maxTouchPoints > 1 && navigator.platform === 'MacIntel';
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+                        || navigator.standalone === true;
+      this._isIosSafari = (isIosUA || isIpadOS) && !isStandalone;
+
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        this._deferredInstallPrompt = e;
+        this.maybeShowInstallBanner();
+      });
+      window.addEventListener('appinstalled', () => {
+        this.installPromptVisible = false;
+        this._deferredInstallPrompt = null;
+        try { localStorage.setItem('gestione_affitti_installed', '1'); } catch (_) {}
+      });
+      this.recordSession();
+      this.maybeShowInstallBanner();
+
       // Verifica se esiste una sessione attiva
       const { data: { session } } = await sb.auth.getSession();
       if (session) {
@@ -326,12 +380,18 @@ function app() {
         lista.push({ ts: new Date().toISOString(), dati: preState });
         while (lista.length > 10) lista.shift();
         localStorage.setItem('gestione_affitti_snapshots', JSON.stringify(lista));
+        // Notifica Alpine: bump del version counter forza re-eval di snapshots()
+        // nei template (x-for, x-if). Senza questo, la UI ignora le scritture
+        // a localStorage.
+        this._snapshotVersion = (this._snapshotVersion || 0) + 1;
       } catch (e) {
         // QuotaExceededError o JSON troppo grande: log non-fatale.
         this.pushErrore({ message: 'pushSnapshot: ' + (e && e.message), severity: 'warn' });
       }
     },
     snapshots() {
+      // Touch reactive counter so Alpine ri-runs questo getter al bump in pushSnapshot.
+      void this._snapshotVersion;
       try {
         const raw = localStorage.getItem('gestione_affitti_snapshots');
         const arr = raw ? JSON.parse(raw) : [];
@@ -519,6 +579,58 @@ function app() {
       this.undoToast.timerId = null;
     },
 
+    // --- PWA install prompt helpers (PR2a REQ-PWA-03) ---
+    // localStorage keys:
+    //   gestione_affitti_session_log              ISO[] (rolling 7d)
+    //   gestione_affitti_install_dismissed_until  ISO date (banner hidden until)
+    //   gestione_affitti_installed                "1" se appinstalled fired
+    recordSession() {
+      try {
+        const raw = localStorage.getItem('gestione_affitti_session_log');
+        const arr = raw ? JSON.parse(raw) : [];
+        const list = Array.isArray(arr) ? arr : [];
+        const now = new Date();
+        const cutoffIso = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        const SESSION_GAP_MS = 30 * 60 * 1000;
+        const last = list.length ? new Date(list[list.length - 1]).getTime() : 0;
+        if (now.getTime() - last > SESSION_GAP_MS) list.push(now.toISOString());
+        const pruned = list.filter((iso) => iso >= cutoffIso);
+        localStorage.setItem('gestione_affitti_session_log', JSON.stringify(pruned));
+      } catch (_) {}
+    },
+    maybeShowInstallBanner() {
+      try {
+        if (localStorage.getItem('gestione_affitti_installed') === '1') return;
+        const dismissedUntil = localStorage.getItem('gestione_affitti_install_dismissed_until');
+        if (dismissedUntil && new Date().toISOString() < dismissedUntil) return;
+        const raw = localStorage.getItem('gestione_affitti_session_log');
+        const arr = raw ? JSON.parse(raw) : [];
+        if (!Array.isArray(arr) || arr.length < 3) return;
+        // Chrome/Android: serve beforeinstallprompt catturato.
+        // iOS Safari: nessun evento ma mostriamo comunque le istruzioni Condividi.
+        if (!this._isIosSafari && !this._deferredInstallPrompt) return;
+        this.installPromptVisible = true;
+      } catch (_) {}
+    },
+    async installApp() {
+      if (this._isIosSafari) return; // iOS: il banner mostra solo istruzioni
+      if (!this._deferredInstallPrompt) return;
+      try {
+        this._deferredInstallPrompt.prompt();
+        await this._deferredInstallPrompt.userChoice;
+      } catch (_) {}
+      this._deferredInstallPrompt = null;
+      this.installPromptVisible = false;
+    },
+    dismissInstallPrompt() {
+      try {
+        const INSTALL_DISMISS_DAYS = 14;
+        const until = new Date(Date.now() + INSTALL_DISMISS_DAYS * 24 * 60 * 60 * 1000).toISOString();
+        localStorage.setItem('gestione_affitti_install_dismissed_until', until);
+      } catch (_) {}
+      this.installPromptVisible = false;
+    },
+
     /** Aggiunge un'entry al ring buffer FIFO di 50 errori in localStorage.errori.
      *  Mai re-throwa: solo log + storage. Filtra implicitamente i campi: niente PII. */
     pushErrore(entry) {
@@ -704,6 +816,13 @@ function app() {
       // due azioni rapide consecutive in un solo salvaSubito → perderemmo lo
       // snapshot intermedio (R-J: M-4 originale era directionally right ma
       // posizionarlo nel debounced runner perde stati osservabili dall'utente).
+      // SNAP-01 fix (PR2a): defensive re-prime di _lastSnapshotData se ancora
+      // null al momento della prima salva() (race tra caricaDatiUtente paths o
+      // finally guard non eseguito). Garantisce >=1 setItem('gestione_affitti_snapshots')
+      // per ogni utente loggato — chiude il test snapshot.spec un-skipped.
+      if (!this._lastSnapshotData) {
+        try { this._lastSnapshotData = JSON.parse(JSON.stringify(this.dati)); } catch (_) {}
+      }
       if (this._lastSnapshotData) {
         this.pushSnapshot(this._lastSnapshotData);
       }
@@ -957,19 +1076,23 @@ function app() {
     // --- Calendario ---
     gruppiCalendario() {
       const mese = this.annoCalendario + '-' + String(this.meseCalendario + 1).padStart(2, '0');
-      const incM = this.attivi(this.dati.incassiAffitti).filter(i => i.mese === mese);
+      // UNDO-01 fix (PR2a): inline filter su this.dati.* invece di passare per
+      // this.attivi(). Alpine perde reactivity attraverso il wrapper helper:
+      // l'undo di un soft-delete non aggiornava le card finche' non si cambiava
+      // mese. L'inline access ripristina il tracking.
+      const incM = (this.dati.incassiAffitti || []).filter(i => !i.deletedAt && i.mese === mese);
       const g1 = { label: 'Giorno 1', incassi: [], mancanti: [] };
       const g15 = { label: 'Giorno 15', incassi: [], mancanti: [] };
       const gfine = { label: 'Fine mese', incassi: [], mancanti: [] };
       const bucket = (s) => s === '1' ? g1 : (s === '15' ? g15 : gfine);
       const orfani = [];
       for (const inc of incM) {
-        const prop = this.attivi(this.dati.proprieta).find(p => p.id === inc.proprietaId);
+        const prop = (this.dati.proprieta || []).find(p => !p.deletedAt && p.id === inc.proprietaId);
         if (!prop) { orfani.push(inc); continue; }
         bucket(prop.scadenzaAffitto).incassi.push(inc);
       }
       // Proprietà esistenti senza incasso per il mese (di solito perché importo mensile = 0)
-      for (const prop of this.attivi(this.dati.proprieta)) {
+      for (const prop of (this.dati.proprieta || []).filter(p => !p.deletedAt)) {
         const ha = incM.some(i => i.proprietaId === prop.id);
         if (!ha) bucket(prop.scadenzaAffitto).mancanti.push(prop);
       }
