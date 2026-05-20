@@ -976,19 +976,23 @@ function app() {
     // --- Calendario ---
     gruppiCalendario() {
       const mese = this.annoCalendario + '-' + String(this.meseCalendario + 1).padStart(2, '0');
-      const incM = this.attivi(this.dati.incassiAffitti).filter(i => i.mese === mese);
+      // UNDO-01 fix (PR2a): inline filter su this.dati.* invece di passare per
+      // this.attivi(). Alpine perde reactivity attraverso il wrapper helper:
+      // l'undo di un soft-delete non aggiornava le card finche' non si cambiava
+      // mese. L'inline access ripristina il tracking.
+      const incM = (this.dati.incassiAffitti || []).filter(i => !i.deletedAt && i.mese === mese);
       const g1 = { label: 'Giorno 1', incassi: [], mancanti: [] };
       const g15 = { label: 'Giorno 15', incassi: [], mancanti: [] };
       const gfine = { label: 'Fine mese', incassi: [], mancanti: [] };
       const bucket = (s) => s === '1' ? g1 : (s === '15' ? g15 : gfine);
       const orfani = [];
       for (const inc of incM) {
-        const prop = this.attivi(this.dati.proprieta).find(p => p.id === inc.proprietaId);
+        const prop = (this.dati.proprieta || []).find(p => !p.deletedAt && p.id === inc.proprietaId);
         if (!prop) { orfani.push(inc); continue; }
         bucket(prop.scadenzaAffitto).incassi.push(inc);
       }
       // Proprietà esistenti senza incasso per il mese (di solito perché importo mensile = 0)
-      for (const prop of this.attivi(this.dati.proprieta)) {
+      for (const prop of (this.dati.proprieta || []).filter(p => !p.deletedAt)) {
         const ha = incM.some(i => i.proprietaId === prop.id);
         if (!ha) bucket(prop.scadenzaAffitto).mancanti.push(prop);
       }
