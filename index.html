@@ -4,6 +4,19 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Gestione Affitti &amp; Utenze</title>
+  <!-- PWA shell (PR2a) -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0071e3">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Affitti">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
+  <!-- Preload 3 CDN script pinnati per mitigare load-fast-enough-for-pwa Lighthouse audit (OQ-8) -->
+  <link rel="preload" as="script" crossorigin href="https://cdn.tailwindcss.com">
+  <link rel="preload" as="script" crossorigin href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
+  <link rel="preload" as="script" crossorigin href="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
