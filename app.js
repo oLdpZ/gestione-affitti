@@ -128,6 +128,11 @@ function app() {
     // resta sullo stato iniziale "Nessuno snapshot disponibile" anche dopo
     // pushSnapshot effettivo (SNAP-01 root cause, scoperto via CI debug PR2a).
     _snapshotVersion: 0,
+    // PR2b dual-write flag + sync timestamps (DEC-012, plan 05-01)
+    usaNuovoSchema: true,
+    lastPullAt: null,
+    lastPushAt: null,
+    _isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
     // PWA install prompt (PR2a REQ-PWA-03)
     installPromptVisible: false,
     _deferredInstallPrompt: null,
@@ -198,6 +203,14 @@ function app() {
           console.warn('SW boot error:', e);
         }
       }
+
+      // PR2b dual-write rollback flag (DEC-012, plan 05-01)
+      try {
+        this.usaNuovoSchema = localStorage.getItem('usaNuovoSchema') !== 'false';
+      } catch (_) { this.usaNuovoSchema = true; }
+      // PR2b _isOnline reactive (R-NEW-7 mitigation, plan 05-01)
+      window.addEventListener('online',  () => { this._isOnline = true; });
+      window.addEventListener('offline', () => { this._isOnline = false; });
 
       // PWA install prompt detection (PR2a REQ-PWA-03)
       // iOS Safari NON espone beforeinstallprompt; iPadOS 13+ si maschera come
@@ -713,8 +726,78 @@ function app() {
       return msg;
     },
 
+    // --- PR2b: hybrid snake↔camel helpers (DEC-OQ-2, plan 05-01 T-05-01-03) ---
+    // Layer 1: generic recursive (gestisce ~95% dei campi che seguono pure snake↔camel)
+    _snakeToCamel(k) { return k.replace(/_([a-z])/g, (_, c) => c.toUpperCase()); },
+    _camelToSnake(k) { return k.replace(/[A-Z]/g, (c) => '_' + c.toLowerCase()); },
+    adattaShape(obj, conv) {
+      if (Array.isArray(obj)) return obj.map(x => this.adattaShape(x, conv));
+      if (obj && typeof obj === 'object' && !(obj instanceof Date)) {
+        return Object.fromEntries(
+          Object.entries(obj).map(([k, v]) => [conv(k), this.adattaShape(v, conv)])
+        );
+      }
+      return obj;
+    },
+    fromDb(row) { return this.adattaShape(row, this._snakeToCamel); },
+    toDb(obj)   { return this.adattaShape(obj, this._camelToSnake); },
+    // Layer 2: per-entity overrides (legacy quirks: proprieta usa bancaIncasso/
+    // bancaDestinazione senza Id suffix per UUID FK; schema PR2b ha _id).
+    fromDbProprieta(p) {
+      if (!p) return p;
+      const c = this.fromDb(p);
+      c.bancaIncasso = c.bancaIncassoId != null ? c.bancaIncassoId : null;
+      c.bancaDestinazione = c.bancaDestinazioneId != null ? c.bancaDestinazioneId : null;
+      delete c.bancaIncassoId;
+      delete c.bancaDestinazioneId;
+      return c;
+    },
+    toDbProprieta(prop) {
+      if (!prop) return prop;
+      const { bancaIncasso, bancaDestinazione, ...rest } = prop;
+      const snake = this.toDb(rest);
+      snake.banca_incasso_id = bancaIncasso || null;
+      snake.banca_destinazione_id = bancaDestinazione || null;
+      return snake;
+    },
+
     // --- Persistenza su Supabase ---
     async caricaDatiUtente() {
+      if (!this.utente) return;
+      // PR2b dual-read (DEC-012 Phase 1): prova RPC nuovo schema; se vuoto/errore
+      // → fallback al blob legacy. La migrazione blob→entità arriva in plan 05-03.
+      if (this.usaNuovoSchema) {
+        try {
+          const { data, error } = await sb.rpc('get_user_data');
+          if (!error && data && Array.isArray(data.proprieta) && data.proprieta.length > 0) {
+            this.dati = {
+              dataVersion: 3,
+              tipiUtenza:     (data.tipi_utenza     || []).map(t => this.fromDb(t)),
+              banche:         (data.banche          || []).map(b => this.fromDb(b)),
+              proprieta:      (data.proprieta       || []).map(p => this.fromDbProprieta(p)),
+              inquilini:      (data.inquilini       || []).map(i => this.fromDb(i)),
+              incassiAffitti: (data.incassi_affitti || []).map(i => this.fromDb(i)),
+              utenze:         (data.utenze          || []).map(u => this.fromDb(u)),
+              cestino: data.cestino || { banche: [], proprieta: [], inquilini: [], incassi_affitti: [], utenze: [] },
+            };
+            this.lastPullAt = new Date().toISOString();
+            this._lastSnapshotData = JSON.parse(JSON.stringify(this.dati));
+            this.statoSalvataggio = 'salvato';
+            this.modalitaOffline = false;
+            return;
+          }
+          // RPC ok ma tabelle vuote → fall through al blob path (Phase 1 dual-read)
+        } catch (e) {
+          this.pushErrore({
+            ts: new Date().toISOString(),
+            message: 'rpc get_user_data: ' + (e && e.message ? e.message : 'unknown'),
+            severity: 'warn',
+          });
+          // fall through al blob path
+        }
+      }
+
+      // ===== LEGACY BLOB PATH (Phase 1 fallback, preservato integro) =====
       this.statoSalvataggio = 'salvataggio';
       let _primingDone = false;
       try {
