@@ -128,6 +128,10 @@ function app() {
     // resta sullo stato iniziale "Nessuno snapshot disponibile" anche dopo
     // pushSnapshot effettivo (SNAP-01 root cause, scoperto via CI debug PR2a).
     _snapshotVersion: 0,
+    // PWA install prompt (PR2a REQ-PWA-03)
+    installPromptVisible: false,
+    _deferredInstallPrompt: null,
+    _isIosSafari: false,
     storagePctValue: null,
     proprietaSelezionata: null,
     annoProprieta: new Date().getFullYear(),
@@ -194,6 +198,30 @@ function app() {
           console.warn('SW boot error:', e);
         }
       }
+
+      // PWA install prompt detection (PR2a REQ-PWA-03)
+      // iOS Safari NON espone beforeinstallprompt; iPadOS 13+ si maschera come
+      // MacIntel quindi il check UA da solo non basta (OQ-6 del plan).
+      const ua = navigator.userAgent;
+      const isIosUA = /iPhone|iPad|iPod/.test(ua);
+      const isIpadOS = navigator.maxTouchPoints > 1 && navigator.platform === 'MacIntel';
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+                        || navigator.standalone === true;
+      this._isIosSafari = (isIosUA || isIpadOS) && !isStandalone;
+
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        this._deferredInstallPrompt = e;
+        this.maybeShowInstallBanner();
+      });
+      window.addEventListener('appinstalled', () => {
+        this.installPromptVisible = false;
+        this._deferredInstallPrompt = null;
+        try { localStorage.setItem('gestione_affitti_installed', '1'); } catch (_) {}
+      });
+      this.recordSession();
+      this.maybeShowInstallBanner();
+
       // Verifica se esiste una sessione attiva
       const { data: { session } } = await sb.auth.getSession();
       if (session) {
@@ -549,6 +577,58 @@ function app() {
       this.undoToast.active = false;
       this.undoToast.undoFn = null;
       this.undoToast.timerId = null;
+    },
+
+    // --- PWA install prompt helpers (PR2a REQ-PWA-03) ---
+    // localStorage keys:
+    //   gestione_affitti_session_log              ISO[] (rolling 7d)
+    //   gestione_affitti_install_dismissed_until  ISO date (banner hidden until)
+    //   gestione_affitti_installed                "1" se appinstalled fired
+    recordSession() {
+      try {
+        const raw = localStorage.getItem('gestione_affitti_session_log');
+        const arr = raw ? JSON.parse(raw) : [];
+        const list = Array.isArray(arr) ? arr : [];
+        const now = new Date();
+        const cutoffIso = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        const SESSION_GAP_MS = 30 * 60 * 1000;
+        const last = list.length ? new Date(list[list.length - 1]).getTime() : 0;
+        if (now.getTime() - last > SESSION_GAP_MS) list.push(now.toISOString());
+        const pruned = list.filter((iso) => iso >= cutoffIso);
+        localStorage.setItem('gestione_affitti_session_log', JSON.stringify(pruned));
+      } catch (_) {}
+    },
+    maybeShowInstallBanner() {
+      try {
+        if (localStorage.getItem('gestione_affitti_installed') === '1') return;
+        const dismissedUntil = localStorage.getItem('gestione_affitti_install_dismissed_until');
+        if (dismissedUntil && new Date().toISOString() < dismissedUntil) return;
+        const raw = localStorage.getItem('gestione_affitti_session_log');
+        const arr = raw ? JSON.parse(raw) : [];
+        if (!Array.isArray(arr) || arr.length < 3) return;
+        // Chrome/Android: serve beforeinstallprompt catturato.
+        // iOS Safari: nessun evento ma mostriamo comunque le istruzioni Condividi.
+        if (!this._isIosSafari && !this._deferredInstallPrompt) return;
+        this.installPromptVisible = true;
+      } catch (_) {}
+    },
+    async installApp() {
+      if (this._isIosSafari) return; // iOS: il banner mostra solo istruzioni
+      if (!this._deferredInstallPrompt) return;
+      try {
+        this._deferredInstallPrompt.prompt();
+        await this._deferredInstallPrompt.userChoice;
+      } catch (_) {}
+      this._deferredInstallPrompt = null;
+      this.installPromptVisible = false;
+    },
+    dismissInstallPrompt() {
+      try {
+        const INSTALL_DISMISS_DAYS = 14;
+        const until = new Date(Date.now() + INSTALL_DISMISS_DAYS * 24 * 60 * 60 * 1000).toISOString();
+        localStorage.setItem('gestione_affitti_install_dismissed_until', until);
+      } catch (_) {}
+      this.installPromptVisible = false;
     },
 
     /** Aggiunge un'entry al ring buffer FIFO di 50 errori in localStorage.errori.
