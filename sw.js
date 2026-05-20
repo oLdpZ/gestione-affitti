@@ -39,9 +39,26 @@ const NETWORK_ONLY_HOSTS = [
 ];
 
 self.addEventListener('install', (event) => {
+  // Resilient precache: usa Promise.allSettled invece di cache.addAll().
+  // Rationale: addAll() rifiuta l'INTERA install se anche UN solo URL fallisce
+  // (es. CDN irraggiungibile dal runner CI, CORS opaque, throttle). Una install
+  // fallita -> SW non attiva mai -> clients.claim() non firea -> controller
+  // resta null sulla pagina -> REGRESSION-03 timeout. allSettled isola i
+  // fallimenti dei singoli URL; gli URL critici (app shell same-origin) di
+  // solito riescono, i CDN si auto-cachano poi via SWR al primo fetch.
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(PRECACHE_URLS))
+      .then((cache) =>
+        Promise.allSettled(
+          PRECACHE_URLS.map((url) =>
+            fetch(url, { credentials: 'omit', mode: url.startsWith('http') ? 'cors' : 'same-origin' })
+              .then((res) => {
+                if (res && res.status === 200) return cache.put(url, res);
+              })
+              .catch(() => {})
+          )
+        )
+      )
       .then(() => self.skipWaiting())
   );
 });
