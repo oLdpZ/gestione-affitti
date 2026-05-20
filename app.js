@@ -162,11 +162,30 @@ function app() {
       try { localStorage.removeItem('gestione_affitti_dati'); } catch (e) {}
       // Fire-and-forget: aggiorna la percentuale di storage usato dal browser.
       this.aggiornaStoragePct();
+      // PWA shell (PR2a REQ-PWA-02 + CON-010 + CON-017 #3):
+      // unregistra SOLO i SW con scriptURL != sw.js corrente (es. registrazioni
+      // da versioni precedenti dell'app), poi registra sw.js scope './'.
+      // Filter-by-scriptURL preserva il SW attuale; il vecchio "unregister all"
+      // disinstallava anche se stesso ad ogni boot.
       if ('serviceWorker' in navigator) {
         try {
+          const SW_URL = 'sw.js';
+          const SW_ABS = new URL(SW_URL, location.href).href;
           const regs = await navigator.serviceWorker.getRegistrations();
-          for (const r of regs) await r.unregister();
-        } catch (e) {}
+          for (const r of regs) {
+            const active = r.active || r.installing || r.waiting;
+            const url = active && active.scriptURL ? active.scriptURL : '';
+            if (url !== SW_ABS) {
+              await r.unregister();
+            }
+          }
+          // fire-and-forget: non rallentare il boot
+          navigator.serviceWorker.register(SW_URL, { scope: './' }).catch((e) => {
+            console.warn('SW register failed:', e);
+          });
+        } catch (e) {
+          console.warn('SW boot error:', e);
+        }
       }
       // Verifica se esiste una sessione attiva
       const { data: { session } } = await sb.auth.getSession();

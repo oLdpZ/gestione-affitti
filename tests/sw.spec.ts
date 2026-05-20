@@ -1,24 +1,33 @@
-// REGRESSION-03 (CON-017 #3) — Service worker stale unregistered at boot.
-// Phase 1 (pre-PR2a): l'app non ha ancora un SW; l'invariante e' swCount === 0.
-// Il test protegge contro registrazioni accidentali di SW prima di PR2a.
-//
-// TODO(PR2a): quando sw.js spedisce, evolvere il test:
-//   1. Pre-registra un SW stale con scope/version diverso via page.evaluate
-//   2. Reload pagina
-//   3. Asserisci che lo stale e' sparito e resta solo il SW versionato corrente
-// Reference: REQ-PWA-02 + CON-010 (boot unregisters stale SWs).
+// REGRESSION-03 (CON-017 #3) — Service worker stale filter at boot.
+// Phase 4 (PR2a) ha introdotto sw.js: l'invariante evolve da "swCount === 0"
+// a "esattamente 1 SW registrato AND scriptURL matcha sw.js corrente".
+// Il loop in app.js (~riga 165) unregistra SOLO i SW con scriptURL != sw.js
+// e poi registra sw.js scope './'. Il test protegge contro:
+//   - registrazioni multiple (regressioni del filter loop)
+//   - SW residui da versioni precedenti che sopravvivono al boot
+// Reference: REQ-PWA-02 + CON-010.
 
 import { test, expect } from './fixtures';
 
-test('REGRESSION-03: service worker boot invariant (no stale SW)', async ({ page }) => {
+test('REGRESSION-03: stale SWs unregistered at boot, current SW survives', async ({ page }) => {
   await page.goto('/');
   await page.waitForLoadState('networkidle');
 
-  const swCount = await page.evaluate(async () => {
-    if (!('serviceWorker' in navigator)) return 0;
+  // Attendi che il SW corrente prenda controllo (clients.claim()).
+  await page.waitForFunction(
+    () => navigator.serviceWorker.controller !== null,
+    null,
+    { timeout: 10_000 },
+  );
+
+  const scriptUrls = await page.evaluate(async () => {
     const regs = await navigator.serviceWorker.getRegistrations();
-    return regs.length;
+    return regs.map((r) => {
+      const active = r.active || r.installing || r.waiting;
+      return active && active.scriptURL ? active.scriptURL : null;
+    });
   });
 
-  expect(swCount).toBe(0);
+  expect(scriptUrls.length).toBe(1);
+  expect(scriptUrls[0]).toMatch(/sw\.js$/);
 });
