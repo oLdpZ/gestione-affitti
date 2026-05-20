@@ -723,6 +723,13 @@ function app() {
       // due azioni rapide consecutive in un solo salvaSubito → perderemmo lo
       // snapshot intermedio (R-J: M-4 originale era directionally right ma
       // posizionarlo nel debounced runner perde stati osservabili dall'utente).
+      // SNAP-01 fix (PR2a): defensive re-prime di _lastSnapshotData se ancora
+      // null al momento della prima salva() (race tra caricaDatiUtente paths o
+      // finally guard non eseguito). Garantisce >=1 setItem('gestione_affitti_snapshots')
+      // per ogni utente loggato — chiude il test snapshot.spec un-skipped.
+      if (!this._lastSnapshotData) {
+        try { this._lastSnapshotData = JSON.parse(JSON.stringify(this.dati)); } catch (_) {}
+      }
       if (this._lastSnapshotData) {
         this.pushSnapshot(this._lastSnapshotData);
       }
