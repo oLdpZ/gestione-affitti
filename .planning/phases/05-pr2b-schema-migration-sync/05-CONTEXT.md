@@ -221,7 +221,9 @@ PLAN-CHECK del 20/05 ha segnalato 3 MEDIUM. Decisioni risolutive prima di execut
 3. **Boundary helper `adattaShape()`** in `app.js`: due funzioni pure inverse:
    - `snakeToCamel(row)`: applicato sulle response del RPC e su ogni read da Supabase. Trasforma ogni key ricorsivamente.
    - `camelToSnake(obj)`: applicato a ogni payload prima di `.insert()` / `.update()` / `.upsert()` Supabase. Trasforma ogni key ricorsivamente.
-4. **Implementazione**: ~30 LOC totali, vanilla JS, no dipendenze. Pattern:
+4. **Implementazione hybrid (post-discovery 2026-05-20)**: ~50 LOC totali, vanilla JS, no dipendenze.
+
+   **Layer 1 — generic recursive helpers** (per la maggioranza dei campi che seguono pure snake↔camel):
    ```js
    const snakeToCamel = (k) => k.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
    const camelToSnake = (k) => k.replace(/[A-Z]/g, (c) => '_' + c.toLowerCase());
@@ -235,8 +237,43 @@ PLAN-CHECK del 20/05 ha segnalato 3 MEDIUM. Decisioni risolutive prima di execut
    const fromDb = (row) => adattaShape(row, snakeToCamel);
    const toDb = (obj) => adattaShape(obj, camelToSnake);
    ```
-5. **Edge case**: gli ID UUID sono già senza separatori, no transform.
-6. **Entry point**: aggiungere `fromDb`/`toDb` come prime utility nel file `app.js` subito dopo `import` (o dopo `supabase` init). Tutte le RPC/query nuove devono usarle. Le RPC/query vecchie sul blob NON sono toccate (continuano a esistere durante dual-write).
+
+   **Layer 2 — per-entity overrides** per legacy quirks dove il rename non segue pure case:
+   ```js
+   // Proprietà: legacy usa `bancaIncasso`/`bancaDestinazione` (no `Id` suffix) per UUID FK.
+   // Schema PR2b ha `banca_incasso_id`/`banca_destinazione_id`. Override richiesto.
+   function fromDbProprieta(p) {
+     if (!p) return p;
+     const c = fromDb(p);
+     // Strip `Id` suffix per match legacy bindings (index.html + ~6 call sites in app.js)
+     c.bancaIncasso = c.bancaIncassoId ?? null;
+     c.bancaDestinazione = c.bancaDestinazioneId ?? null;
+     delete c.bancaIncassoId;
+     delete c.bancaDestinazioneId;
+     return c;
+   }
+   function toDbProprieta(prop) {
+     if (!prop) return prop;
+     // Camel prop in input. Restituisce snake con `_id` suffix corretto al DB.
+     const { bancaIncasso, bancaDestinazione, ...rest } = prop;
+     const snake = toDb(rest);
+     snake.banca_incasso_id = bancaIncasso || null;
+     snake.banca_destinazione_id = bancaDestinazione || null;
+     return snake;
+   }
+   ```
+
+   **Altre entità (inquilini, banche, incassi_affitti, utenze, tipi_utenza)**: i loro campi seguono pure snake↔camel — usano direttamente `fromDb` / `toDb` senza wrapper. Esempi verificati nel codebase legacy: `bancaId` ↔ `banca_id`, `bancaDestinazioneId` (su incasso) ↔ `banca_destinazione_id`, `proprietaId` ↔ `proprieta_id`, `tipoId` ↔ `tipo_id`, `codiceFiscale` ↔ `codice_fiscale`, `dataIncasso` ↔ `data_incasso`, `modificatoManualmente` ↔ `modificato_manualmente`, `dataScadenza` ↔ `data_scadenza`, `dataPagamento` ↔ `data_pagamento`, `dataRicezione` ↔ `data_ricezione`, `dataGiro` ↔ `data_giro`, `importoAffittoMensile` ↔ `importo_affitto_mensile`, `scadenzaGiorno` ↔ `scadenza_giorno`, `deletedAt` ↔ `deleted_at`, `userId` ↔ `user_id`, `createdAt` ↔ `created_at`, `updatedAt` ↔ `updated_at`.
+
+5. **Edge case**: gli ID UUID sono già senza separatori `_`, no transform applicato.
+
+6. **Entry point**: aggiungere come Alpine methods nella function `app()` (siblings a `migraDati`). Tutte le RPC/query nuove devono usarle. Le RPC/query vecchie sul blob NON sono toccate (continuano a esistere durante dual-write).
+
+7. **Plan call sites**:
+   - **Read** (RPC response in `caricaDatiUtente`): mappare `data.proprieta.map(this.fromDbProprieta)` per proprietà; `data.inquilini.map(this.fromDb)` per inquilini (pure case); idem per banche/incassi/utenze/tipi_utenza.
+   - **Write** (mutation queue enqueue): `this.enqueueMutation('insert', 'proprieta', id, this.toDbProprieta(propCamel))` per proprietà; `this.toDb(inqCamel)` per inquilini e altri.
+
+8. **Falsificazione futuri override**: se nuove entità introducono FK senza `_id` suffix legacy, aggiungere wrapper analogo (`fromDbXyz`/`toDbXyz`). Documentare ogni override qui in CONTEXT.
 
 **Plan impact**:
 - 05-01 T-05-01-03 (dual-read adapter): DEVE usare `fromDb` sulla response RPC
