@@ -121,6 +121,13 @@ function app() {
     authLoading: false,
     debounceTimer: null,
     _lastSnapshotData: null,
+    // Counter reattivo per Alpine: ogni pushSnapshot lo incrementa, snapshots()
+    // lo legge (void this._snapshotVersion) -> Alpine sa di dover ri-eseguire
+    // il template x-for quando localStorage cambia. Senza questo, snapshots()
+    // legge solo localStorage e Alpine non traccia alcun dep -> il template
+    // resta sullo stato iniziale "Nessuno snapshot disponibile" anche dopo
+    // pushSnapshot effettivo (SNAP-01 root cause, scoperto via CI debug PR2a).
+    _snapshotVersion: 0,
     storagePctValue: null,
     proprietaSelezionata: null,
     annoProprieta: new Date().getFullYear(),
@@ -345,12 +352,18 @@ function app() {
         lista.push({ ts: new Date().toISOString(), dati: preState });
         while (lista.length > 10) lista.shift();
         localStorage.setItem('gestione_affitti_snapshots', JSON.stringify(lista));
+        // Notifica Alpine: bump del version counter forza re-eval di snapshots()
+        // nei template (x-for, x-if). Senza questo, la UI ignora le scritture
+        // a localStorage.
+        this._snapshotVersion = (this._snapshotVersion || 0) + 1;
       } catch (e) {
         // QuotaExceededError o JSON troppo grande: log non-fatale.
         this.pushErrore({ message: 'pushSnapshot: ' + (e && e.message), severity: 'warn' });
       }
     },
     snapshots() {
+      // Touch reactive counter so Alpine ri-runs questo getter al bump in pushSnapshot.
+      void this._snapshotVersion;
       try {
         const raw = localStorage.getItem('gestione_affitti_snapshots');
         const arr = raw ? JSON.parse(raw) : [];
@@ -715,11 +728,7 @@ function app() {
      *  La cache locale viene scritta SUBITO (non aspetta il debounce) per
      *  proteggere dai refresh mentre il timer e pending. */
     salva() {
-      if (!this.utente) {
-        console.warn('[snap-debug] salva() early return: no utente');
-        return;
-      }
-      console.info('[snap-debug] salva() invoked. _lastSnapshotData null?', this._lastSnapshotData === null, 'dati keys:', this.dati ? Object.keys(this.dati).join(',') : 'NO_DATI');
+      if (!this.utente) return;
       this.statoSalvataggio = 'salvataggio';
       // Snapshot pre-mutation: ogni chiamata a salva() corrisponde a UN'azione
       // utente discreta (eliminaIncasso, salvaBanca, segnaIncassatoOggi, ...).
@@ -732,14 +741,10 @@ function app() {
       // finally guard non eseguito). Garantisce >=1 setItem('gestione_affitti_snapshots')
       // per ogni utente loggato — chiude il test snapshot.spec un-skipped.
       if (!this._lastSnapshotData) {
-        try { this._lastSnapshotData = JSON.parse(JSON.stringify(this.dati)); console.info('[snap-debug] defensive prime OK, length:', JSON.stringify(this._lastSnapshotData).length); } catch (e) { console.error('[snap-debug] defensive prime FAILED:', e); }
+        try { this._lastSnapshotData = JSON.parse(JSON.stringify(this.dati)); } catch (_) {}
       }
       if (this._lastSnapshotData) {
-        console.info('[snap-debug] calling pushSnapshot');
         this.pushSnapshot(this._lastSnapshotData);
-        console.info('[snap-debug] post-pushSnapshot, ls len:', (localStorage.getItem('gestione_affitti_snapshots') || '').length);
-      } else {
-        console.warn('[snap-debug] _lastSnapshotData still null, skip pushSnapshot');
       }
       // Aggiorna il riferimento "ultimo stato osservato" alla mutazione appena
       // applicata: sara' il pre-state della prossima salva().
