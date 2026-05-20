@@ -1347,6 +1347,39 @@
   </div>
   </template>
 
+  <!-- ===== Install prompt banner (PR2a REQ-PWA-03) =====
+       Riusa il design system PR0 (.glass-card + .btn-primary/.btn-secondary).
+       Zero nuove regole CSS globali; positioning via inline style. -->
+  <div
+    x-show="installPromptVisible"
+    x-cloak
+    data-testid="install-banner"
+    class="glass-card"
+    style="position: fixed; left: 16px; right: 16px; bottom: 16px; z-index: var(--z-toast);
+           padding: 16px; display: flex; gap: 12px; align-items: center; max-width: 520px; margin: 0 auto;"
+  >
+    <div style="flex: 1;">
+      <div style="font-weight: 600; margin-bottom: 4px;">Aggiungi alla schermata Home</div>
+      <div x-show="!_isIosSafari" style="font-size: 13px; color: var(--text-secondary);">
+        Installa l'app per accedere piu rapidamente, anche offline.
+      </div>
+      <div x-show="_isIosSafari" style="font-size: 13px; color: var(--text-secondary);">
+        Tocca <strong>Condividi</strong> &rarr; <strong>Aggiungi a Home</strong>.
+      </div>
+    </div>
+    <button
+      x-show="!_isIosSafari"
+      class="btn-primary"
+      data-testid="install-confirm"
+      @click="installApp()"
+    >Aggiungi</button>
+    <button
+      class="btn-secondary"
+      data-testid="install-dismiss"
+      @click="dismissInstallPrompt()"
+    >Piu tardi</button>
+  </div>
+
   <!-- ===== Undo toast (5s, stack model) ===== -->
   <div x-show="undoToast.active"
        x-transition.opacity.duration.200ms
