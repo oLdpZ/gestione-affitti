@@ -715,7 +715,11 @@ function app() {
      *  La cache locale viene scritta SUBITO (non aspetta il debounce) per
      *  proteggere dai refresh mentre il timer e pending. */
     salva() {
-      if (!this.utente) return;
+      if (!this.utente) {
+        console.warn('[snap-debug] salva() early return: no utente');
+        return;
+      }
+      console.info('[snap-debug] salva() invoked. _lastSnapshotData null?', this._lastSnapshotData === null, 'dati keys:', this.dati ? Object.keys(this.dati).join(',') : 'NO_DATI');
       this.statoSalvataggio = 'salvataggio';
       // Snapshot pre-mutation: ogni chiamata a salva() corrisponde a UN'azione
       // utente discreta (eliminaIncasso, salvaBanca, segnaIncassatoOggi, ...).
@@ -728,10 +732,14 @@ function app() {
       // finally guard non eseguito). Garantisce >=1 setItem('gestione_affitti_snapshots')
       // per ogni utente loggato — chiude il test snapshot.spec un-skipped.
       if (!this._lastSnapshotData) {
-        try { this._lastSnapshotData = JSON.parse(JSON.stringify(this.dati)); } catch (_) {}
+        try { this._lastSnapshotData = JSON.parse(JSON.stringify(this.dati)); console.info('[snap-debug] defensive prime OK, length:', JSON.stringify(this._lastSnapshotData).length); } catch (e) { console.error('[snap-debug] defensive prime FAILED:', e); }
       }
       if (this._lastSnapshotData) {
+        console.info('[snap-debug] calling pushSnapshot');
         this.pushSnapshot(this._lastSnapshotData);
+        console.info('[snap-debug] post-pushSnapshot, ls len:', (localStorage.getItem('gestione_affitti_snapshots') || '').length);
+      } else {
+        console.warn('[snap-debug] _lastSnapshotData still null, skip pushSnapshot');
       }
       // Aggiorna il riferimento "ultimo stato osservato" alla mutazione appena
       // applicata: sara' il pre-state della prossima salva().
