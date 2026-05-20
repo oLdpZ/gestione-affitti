@@ -1,4 +1,4 @@
-// sw.js — PR2a (REQ-PWA-02). Versioned cache, Stale-While-Revalidate per
+// sw.js — PR2b → v2 (added idb-keyval). Versioned cache, Stale-While-Revalidate per
 // app shell + CDN pinnati. NON cacha le chiamate Supabase API (devono
 // sempre andare in rete: dati live + auth).
 //
@@ -12,7 +12,7 @@
 // Bump CACHE_NAME a ogni deploy che cambia file in PRECACHE_URLS.
 // Naming: 'gestione-affitti-v<N>' (N intero monotono crescente).
 
-const CACHE_NAME = 'gestione-affitti-v1';
+const CACHE_NAME = 'gestione-affitti-v2';
 
 const PRECACHE_URLS = [
   './',
@@ -27,6 +27,7 @@ const PRECACHE_URLS = [
   'https://cdn.tailwindcss.com',
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
   'https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js',
+  'https://cdn.jsdelivr.net/npm/idb-keyval@6.2.2/dist/umd.js',
 ];
 
 // URL pattern che NON devono mai essere cachati (devono sempre andare in rete).
