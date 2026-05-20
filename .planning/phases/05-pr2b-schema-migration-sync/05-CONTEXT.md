@@ -206,6 +206,66 @@ $$;
 
 </deferred>
 
+<pre_execute_decisions>
+## Pre-Execute Decisions (locked 2026-05-20, post PLAN-CHECK)
+
+PLAN-CHECK del 20/05 ha segnalato 3 MEDIUM. Decisioni risolutive prima di execute:
+
+### DEC-OQ-2: naming convention boundary (snake_case ↔ camelCase) — LOCKED
+
+**Problema**: SQL Postgres conventions vogliono `snake_case` (es. `scadenza_giorno`, `data_pagamento`, `codice_fiscale`). Il codice JS esistente in `app.js` usa `camelCase` (`scadenzaGiorno`, `dataPagamento`, `codiceFiscale`). RPC `get_user_data()` ritorna JSON con keys snake_case di default.
+
+**Decisione**:
+1. **SQL canonical**: tutte le colonne nelle tabelle nuove usano `snake_case`. Esempi: `scadenza_giorno`, `data_pagamento`, `data_incasso`, `data_ricezione`, `data_scadenza`, `codice_fiscale`, `modificato_manualmente`, `proprieta_id`, `tipo_id`, `banca_id`, `deleted_at`, `updated_at`, `created_at`, `user_id`.
+2. **JS canonical**: in-memory state e UI bindings usano `camelCase`. Esempi: `scadenzaGiorno`, `dataPagamento`, `codiceFiscale`, `modificatoManualmente`, `proprietaId`, `tipoId`, `bancaId`, `deletedAt`, `updatedAt`, `createdAt`, `userId`.
+3. **Boundary helper `adattaShape()`** in `app.js`: due funzioni pure inverse:
+   - `snakeToCamel(row)`: applicato sulle response del RPC e su ogni read da Supabase. Trasforma ogni key ricorsivamente.
+   - `camelToSnake(obj)`: applicato a ogni payload prima di `.insert()` / `.update()` / `.upsert()` Supabase. Trasforma ogni key ricorsivamente.
+4. **Implementazione**: ~30 LOC totali, vanilla JS, no dipendenze. Pattern:
+   ```js
+   const snakeToCamel = (k) => k.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+   const camelToSnake = (k) => k.replace(/[A-Z]/g, (c) => '_' + c.toLowerCase());
+   function adattaShape(obj, conv) {
+     if (Array.isArray(obj)) return obj.map(x => adattaShape(x, conv));
+     if (obj && typeof obj === 'object' && !(obj instanceof Date)) {
+       return Object.fromEntries(Object.entries(obj).map(([k, v]) => [conv(k), adattaShape(v, conv)]));
+     }
+     return obj;
+   }
+   const fromDb = (row) => adattaShape(row, snakeToCamel);
+   const toDb = (obj) => adattaShape(obj, camelToSnake);
+   ```
+5. **Edge case**: gli ID UUID sono già senza separatori, no transform.
+6. **Entry point**: aggiungere `fromDb`/`toDb` come prime utility nel file `app.js` subito dopo `import` (o dopo `supabase` init). Tutte le RPC/query nuove devono usarle. Le RPC/query vecchie sul blob NON sono toccate (continuano a esistere durante dual-write).
+
+**Plan impact**:
+- 05-01 T-05-01-03 (dual-read adapter): DEVE usare `fromDb` sulla response RPC
+- 05-01 task NEW da inserire pre-T-05-01-03: **T-05-01-02b — Aggiungere helper `adattaShape` + `fromDb`/`toDb` in app.js** (~30 LOC, wave 1, depends_on T-05-01-02)
+- 05-02 mutation queue: payload memorizzato in IDB è in formato camelCase (JS-native). Conversione a snake_case avviene SOLO al momento del flush via `toDb()`.
+- Tutti i piani: ogni task che tocca SQL DDL usa snake_case; ogni task che tocca state JS usa camelCase; ogni task che attraversa il boundary referenzia esplicitamente `fromDb` o `toDb`.
+
+### DEC-EPIC-SPLIT-1: T-05-02-06 `salva()` refactor — split locked
+
+**Problema**: T-05-02-06 originale (~150 LOC) refactor della funzione `salva()` per integrare la mutation queue è epic-sized. Single commit difficile da revisionare; rollback grezzo.
+
+**Split in 3 sub-task** (tutti wave 2, sequenziali, depends_on T-05-02-05):
+- **T-05-02-06a — Isolare logica salvataggio blob in `salvaBlobLegacy()`** (~40 LOC): estrarre il corpo attuale di `salva()` in nuova funzione. `salva()` diventa wrapper che chiama `salvaBlobLegacy()` immutato. Test: comportamento identico al precedente.
+- **T-05-02-06b — Aggiungere router dual-write `salvaPerEntita()`** (~60 LOC): nuova funzione che per ogni dirty-entity push nella mutation queue + tenta flush online. Riusa `toDb()` (DEC-OQ-2) al boundary. Wrapper `salva()` ora chiama PRIMA `salvaPerEntita()` POI `salvaBlobLegacy()` (dual-write Phase 1). Test: entrambe le vie scrivono coerentemente.
+- **T-05-02-06c — Aggiungere feature flag `localStorage.usaNuovoSchema`** (~30 LOC): se `false`, skip `salvaPerEntita()`. Se `true` (default post-rollout Phase 2), `salvaBlobLegacy()` resta attivo solo durante dual-write window (2 weeks). Test: toggle del flag riproduce vecchio comportamento.
+
+### DEC-EPIC-SPLIT-2: T-05-04-04 Inquilini CRUD — split locked
+
+**Problema**: T-05-04-04 originale (~150 LOC) implementazione completa CRUD inquilini in Impostazioni è epic-sized.
+
+**Split in 3 sub-task** (tutti wave 3, sequenziali, depends_on T-05-04-03):
+- **T-05-04-04a — Inquilini model + state Alpine + read list view** (~50 LOC): aggiungi `inquilini: []` allo state Alpine, popola da RPC, sezione Impostazioni "Inquilini" con tabella (nome, codice fiscale, telefono, proprietà). No form.
+- **T-05-04-04b — Form add/edit inquilino + validation italiana** (~60 LOC): modal con campi nome (required), codice_fiscale (regex 16 char alfanumeric maiuscolo), telefono (opzionale), email (opzionale, regex), select proprietà. Submit chiama `salvaPerEntita()` con nuovo inquilino. Errori validation italiani inline.
+- **T-05-04-04c — Inquilini soft-delete + cestino integration** (~40 LOC): bottone "Elimina" su ogni riga, set `deletedAt`. Estendere cestino esistente (PR1) con sezione "Inquilini eliminati" + ripristino. Hard-delete bloccato se ci sono incassi referencing inquilino (FK constraint Supabase).
+
+**Risultato**: 4 task originali in 05-04-PLAN.md diventano 6 (5 + 2 sub-task extra = 7 totali). Estimate revisionato: 4.5h → 5h.
+
+</pre_execute_decisions>
+
 ---
 
 *Phase: 05-pr2b-schema-migration-sync*
