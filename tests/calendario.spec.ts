@@ -95,7 +95,7 @@ test.describe('calendario', () => {
     await propForm
       .locator('input[x-model="editProprieta.nome"]')
       .fill('Proprieta E2E Test');
-    await propForm.locator('input[type="number"]').fill('1200');
+    await propForm.locator('input[inputmode="decimal"]').fill('1200');
 
     await propForm.locator('button:has-text("Salva")').click();
 
