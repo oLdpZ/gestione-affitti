@@ -1141,8 +1141,26 @@ function app() {
 
     // Modifica incasso esistente tramite modal
     apriFormIncasso(inc) { this.incassoInModifica = { ...inc }; },
+    /** Converte input importo (virgola o punto, con/senza separatore migliaia) in Number.
+     *  Fix iOS Safari: type="number" rifiuta la virgola decimale del tastierino italiano. */
+    normalizzaImporto(v) {
+      if (typeof v === 'number') return isNaN(v) ? 0 : v;
+      if (v == null) return 0;
+      let s = String(v).trim().replace(/\s/g, '');
+      if (!s) return 0;
+      const lastComma = s.lastIndexOf(','), lastDot = s.lastIndexOf('.');
+      if (lastComma > -1 && lastDot > -1) {
+        // Il separatore decimale è quello più a destra; l'altro sono le migliaia.
+        s = lastComma > lastDot ? s.replace(/\./g, '').replace(',', '.') : s.replace(/,/g, '');
+      } else if (lastComma > -1) {
+        s = s.replace(',', '.');
+      }
+      const n = parseFloat(s);
+      return isNaN(n) ? 0 : Math.round(n * 100) / 100;
+    },
     async salvaIncassoModificato() {
       if (!this.incassoInModifica) return;
+      this.incassoInModifica.importo = this.normalizzaImporto(this.incassoInModifica.importo);
       // Importo=0 soft-confirm (rimpiazza l'antico confirm() nativo).
       if (!(this.incassoInModifica.importo > 0)) {
         const ok = await this.chiediConferma('L\'importo dell\'incasso e 0. Confermi il salvataggio?');
@@ -1271,6 +1289,7 @@ function app() {
       }, { EUR: 0, USD: 0 });
     },
     aggiungiUtenza() {
+      this.nuovaUtenza.importo = this.normalizzaImporto(this.nuovaUtenza.importo);
       const prop = this.attivi(this.dati.proprieta).find(p => p.id === this.nuovaUtenza.proprietaId);
       const currency = this.nuovaUtenza.currency || (prop && prop.currency) || 'EUR';
       this.dati.utenze.push({ id: uid(), ...this.nuovaUtenza, currency });
@@ -1303,6 +1322,7 @@ function app() {
     modificaProprieta(p) { this.editProprieta = { ...p }; this.mostraFormProprieta = true; },
     async salvaProprieta() {
       if (!this.editProprieta.nome) return alert('Inserire il nome');
+      this.editProprieta.importoAffittoMensile = this.normalizzaImporto(this.editProprieta.importoAffittoMensile);
       // Soft-confirm modal Alpine (rimpiazza confirm() nativo per coerenza UX con incasso).
       if (!(this.editProprieta.importoAffittoMensile > 0)) {
         const ok = await this.chiediConferma('Attenzione: importo mensile = ' + (this.editProprieta.importoAffittoMensile || 0) + '. La proprieta NON apparira come incasso sul calendario. Salvare comunque?');

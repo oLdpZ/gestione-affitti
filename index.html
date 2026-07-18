@@ -778,7 +778,7 @@
                 </label>
                 <div class="flex items-center gap-1">
                   <span class="text-sm text-gray-500 w-4 text-center" x-text="(incassoInModifica.currency || 'EUR') === 'USD' ? '$' : '€'"></span>
-                  <input type="number" step="0.01" x-model.number="incassoInModifica.importo" class="flex-1 text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600">
+                  <input type="text" inputmode="decimal" x-model="incassoInModifica.importo" @focus="$event.target.select()" @blur="incassoInModifica.importo = normalizzaImporto(incassoInModifica.importo)" class="flex-1 text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600">
                 </div>
               </div>
               <div>
@@ -1033,7 +1033,7 @@
           <div><label class="text-xs">Scadenza</label>
             <input type="date" x-model="nuovaUtenza.dataScadenza" class="w-full text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600"></div>
           <div><label class="text-xs">Importo</label>
-            <input type="number" step="0.01" x-model.number="nuovaUtenza.importo" class="w-full text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600"></div>
+            <input type="text" inputmode="decimal" x-model="nuovaUtenza.importo" @focus="$event.target.select()" @blur="nuovaUtenza.importo = normalizzaImporto(nuovaUtenza.importo)" class="w-full text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600"></div>
           <div><label class="text-xs">Stato</label>
             <select x-model="nuovaUtenza.stato" class="w-full text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600">
               <option value="da_ricevere">Da ricevere</option><option value="ricevuta">Ricevuta</option>
@@ -1114,7 +1114,7 @@
                 <option value="1">Giorno 1</option><option value="15">Giorno 15</option><option value="fine_mese">Fine mese</option>
               </select></div>
             <div><label class="text-xs">Importo mensile</label>
-              <input type="number" step="0.01" x-model.number="editProprieta.importoAffittoMensile" class="w-full text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600"></div>
+              <input type="text" inputmode="decimal" x-model="editProprieta.importoAffittoMensile" @focus="$event.target.select()" @blur="editProprieta.importoAffittoMensile = normalizzaImporto(editProprieta.importoAffittoMensile)" class="w-full text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600"></div>
             <div><label class="text-xs">Valuta</label>
               <select x-model="editProprieta.currency" class="w-full text-sm border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600">
                 <option value="EUR">Euro (&euro;)</option>

@@ -41,7 +41,7 @@ test.describe('login', () => {
     const propForm = propSection.locator('[data-testid="prop-form"]');
     await expect(propForm).toBeVisible();
 
-    await propForm.locator('input[type="number"]').fill('0');
+    await propForm.locator('input[inputmode="decimal"]').fill('0');
     await propForm.locator('button:has-text("Salva")').click();
 
     // PR1: il modal custom rimpiazza il browser confirm(). Asserisce visibilita
